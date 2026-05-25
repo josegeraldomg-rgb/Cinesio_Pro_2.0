@@ -119,12 +119,14 @@ type Status =
 // Componente principal
 // ═════════════════════════════════════════════════════════════════════════════
 export function ConexaoTab() {
-  const [status,     setStatus]     = useState<Status>('init')
-  const [instanceId, setInstanceId] = useState<string | null>(null)
-  const [qrcode,     setQrcode]     = useState<string | null>(null)
-  const [paircode,   setPaircode]   = useState<string | null>(null)
-  const [phone,      setPhone]      = useState<string | null>(null)
-  const [errorMsg,   setErrorMsg]   = useState<string | null>(null)
+  const [status,        setStatus]        = useState<Status>('init')
+  const [instanceId,    setInstanceId]    = useState<string | null>(null)
+  const [qrcode,        setQrcode]        = useState<string | null>(null)
+  const [paircode,      setPaircode]      = useState<string | null>(null)
+  const [phone,         setPhone]         = useState<string | null>(null)  // phone do WA conectado
+  const [phoneInput,    setPhoneInput]    = useState('')                   // input do usuário para paircode
+  const [usePaircode,   setUsePaircode]   = useState(false)                // toggle QR vs paircode
+  const [errorMsg,      setErrorMsg]      = useState<string | null>(null)
   const [countdown,  setCountdown]  = useState(LOADING_TIMEOUT)
   const [refreshing, setRefreshing] = useState(false)
   const [toast,      setToast]      = useState<{ msg: string; ok: boolean } | null>(null)
@@ -246,10 +248,12 @@ export function ConexaoTab() {
     }
     setInstanceId(criarRes.instanceId)
 
-    // Configura webhook (best effort — não bloqueia se falhar)
+    // Configura webhook (best effort)
     configurarWebhookWaAction().catch(() => {})
 
-    const conectarRes = await conectarWaAction()
+    // Com phone → paircode; sem phone → QR Code
+    const tel = usePaircode && phoneInput.trim() ? phoneInput.trim() : undefined
+    const conectarRes = await conectarWaAction(tel)
     stopCountdown()
 
     if ('error' in conectarRes) {
@@ -258,23 +262,20 @@ export function ConexaoTab() {
       return
     }
     if ('qrcode' in conectarRes) {
-      setStatus('qrcode')
-      setQrcode(conectarRes.qrcode)
-      startPolling()
+      setStatus('qrcode'); setQrcode(conectarRes.qrcode); startPolling()
     } else {
-      setStatus('paircode')
-      setPaircode(conectarRes.paircode)
-      startPolling()
+      setStatus('paircode'); setPaircode(conectarRes.paircode); startPolling()
     }
   }
 
-  // ── Gerar novo QR ────────────────────────────────────────────────────────
+  // ── Gerar novo QR / reconectar ────────────────────────────────────────
   async function handleNovoQr() {
     setStatus('loading')
     startCountdown()
     stopPolling()
 
-    const res = await conectarWaAction()
+    const tel = usePaircode && phoneInput.trim() ? phoneInput.trim() : undefined
+    const res = await conectarWaAction(tel)
     stopCountdown()
 
     if ('error' in res) {
@@ -388,17 +389,55 @@ export function ConexaoTab() {
     // ── sem instância ──
     if (status === 'no_instance') {
       return (
-        <div className="flex flex-col items-center py-16 text-center max-w-xs mx-auto">
+        <div className="flex flex-col items-center py-12 text-center max-w-sm mx-auto">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
             style={{ background: '#F1F5F9', color: '#94A3B8' }}>
             <div className="w-7 h-7"><IconPhone /></div>
           </div>
           <h3 className="font-bold text-[#2C3E50] mb-2">Nenhuma instância criada</h3>
-          <p className="text-sm text-[#7F8C8D] leading-relaxed mb-7">
+          <p className="text-sm text-[#7F8C8D] leading-relaxed mb-6">
             Para começar a enviar mensagens via WhatsApp, precisamos criar uma instância e
             sincronizar seu dispositivo.
           </p>
-          <Btn variant="teal" full onClick={handleCriarEConectar}>
+
+          {/* Toggle QR Code / Paircode */}
+          <div className="flex w-full rounded-xl border border-[#E2E8F0] overflow-hidden mb-4 text-sm font-medium">
+            <button
+              onClick={() => setUsePaircode(false)}
+              className={`flex-1 py-2.5 transition-colors ${!usePaircode ? 'bg-[#0d9488] text-white' : 'bg-white text-[#64748B] hover:bg-slate-50'}`}
+            >
+              📷 QR Code
+            </button>
+            <button
+              onClick={() => setUsePaircode(true)}
+              className={`flex-1 py-2.5 transition-colors ${usePaircode ? 'bg-[#0d9488] text-white' : 'bg-white text-[#64748B] hover:bg-slate-50'}`}
+            >
+              🔢 Código de Pareamento
+            </button>
+          </div>
+
+          {/* Input de telefone (só no modo paircode) */}
+          {usePaircode && (
+            <div className="w-full mb-5">
+              <input
+                type="tel"
+                value={phoneInput}
+                onChange={e => setPhoneInput(e.target.value)}
+                placeholder="5511999999999 (com DDI e DDD)"
+                className="w-full px-4 py-2.5 rounded-xl border border-[#CBD5E1] text-sm text-[#2C3E50] placeholder:text-[#94A3B8] outline-none focus:border-[#0d9488] focus:ring-2 focus:ring-[#0d9488]/20"
+              />
+              <p className="text-xs text-[#94A3B8] mt-1.5 text-left">
+                Formato: código do país + DDD + número. Ex: 5531999999999
+              </p>
+            </div>
+          )}
+
+          <Btn
+            variant="teal"
+            full
+            onClick={handleCriarEConectar}
+            disabled={usePaircode && !phoneInput.trim()}
+          >
             Criar Instância e Conectar
           </Btn>
         </div>

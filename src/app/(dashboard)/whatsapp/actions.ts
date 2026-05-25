@@ -38,6 +38,8 @@ async function uazapiAdmin(
     method,
     headers: {
       'Content-Type': 'application/json',
+      // UAZAPI aceita 'apikey' (Evolution-based) ou 'admin-token' dependendo da versão
+      'apikey':       UAZAPI_ADMIN_TOKEN,
       'admin-token':  UAZAPI_ADMIN_TOKEN,
     },
     body:  body ? JSON.stringify(body) : undefined,
@@ -58,7 +60,8 @@ async function uazapiInstance(
     method,
     headers: {
       'Content-Type': 'application/json',
-      'token':        token,
+      'token':        token,   // UAZAPI padrão
+      'apikey':       token,   // Evolution API v2 / UAZAPI alternativo
     },
     body:  body ? JSON.stringify(body) : undefined,
     cache: 'no-store',
@@ -155,21 +158,26 @@ export async function getStatusWaAction(): Promise<WaStatusResult> {
 
 /**
  * Cria uma nova instância UAZAPI para a empresa e persiste no banco.
- * Após criar, configura o webhook automaticamente.
+ * Endpoint real: POST /instance/create  (sem header de autenticação)
  */
 export async function criarInstanciaWaAction(): Promise<
   { instanceId: string; instanceToken: string } | { error: string }
 > {
   try {
-    if (!isConfigured()) return { error: 'UAZAPI não configurado nas variáveis de ambiente.' }
-
     const { empresaId } = await getEmpresaId()
 
-    // Usa empresa_id como nome da instância (único por empresa)
-    const raw = await uazapiAdmin('/instance/init', 'POST', { name: empresaId })
+    // Endpoint correto conforme documentação UAZAPI — sem auth header
+    const res = await fetch(`${UAZAPI_URL}/instance/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body:  JSON.stringify({ name: empresaId }),
+      cache: 'no-store',
+    })
+    const raw = await res.json().catch(() => ({}))
 
-    const instanceId    = raw.data?.id    ?? raw.id    ?? raw.instance?.id    ?? ''
-    const instanceToken = raw.data?.token ?? raw.token ?? raw.instance?.token ?? ''
+    // Normaliza diferentes formatos de resposta
+    const instanceId    = raw.id    ?? raw.data?.id    ?? raw.instance?.id    ?? ''
+    const instanceToken = raw.token ?? raw.data?.token ?? raw.instance?.token ?? ''
 
     if (!instanceId || !instanceToken) {
       return { error: `Resposta inesperada da UAZAPI: ${JSON.stringify(raw)}` }
@@ -183,10 +191,10 @@ export async function criarInstanciaWaAction(): Promise<
 }
 
 /**
- * Solicita a geração do QR Code ou Pair Code à instância UAZAPI.
- * Retorna o qrcode (base64) ou o paircode alfanumérico.
+ * Solicita QR Code (sem phone) ou Pair Code (com phone) à instância UAZAPI.
+ * Endpoint: POST /instance/connect  •  header: token  •  body: { phone? }
  */
-export async function conectarWaAction(): Promise<
+export async function conectarWaAction(phone?: string): Promise<
   { qrcode: string } | { paircode: string } | { error: string }
 > {
   try {
@@ -196,16 +204,16 @@ export async function conectarWaAction(): Promise<
     const cfg = await getConfig(empresaId)
     if (!cfg) return { error: 'Nenhuma instância encontrada. Crie uma primeiro.' }
 
-    const raw = await uazapiInstance(cfg.instance_token, '/instance/connect', 'POST')
+    // Com phone → paircode; sem phone → QR Code
+    const body = phone ? { phone } : {}
+    const raw  = await uazapiInstance(cfg.instance_token, '/instance/connect', 'POST', body)
 
-    if (raw.qrcode)   return { qrcode: raw.qrcode }
-    if (raw.paircode) return { paircode: raw.paircode }
+    if (raw.qrcode)        return { qrcode: raw.qrcode }
+    if (raw.paircode)      return { paircode: raw.paircode }
+    if (raw.data?.qrcode)  return { qrcode: raw.data.qrcode }
+    if (raw.data?.paircode)return { paircode: raw.data.paircode }
 
-    // Alguns retornos vêm em data.*
-    if (raw.data?.qrcode)   return { qrcode: raw.data.qrcode }
-    if (raw.data?.paircode) return { paircode: raw.data.paircode }
-
-    return { error: `Sem QR Code na resposta: ${JSON.stringify(raw)}` }
+    return { error: `Resposta inesperada: ${JSON.stringify(raw)}` }
   } catch (e: any) {
     return { error: e.message ?? 'Erro ao conectar' }
   }

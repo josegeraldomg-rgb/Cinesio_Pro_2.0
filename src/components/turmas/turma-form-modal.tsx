@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Plus, Trash2, ChevronRight, ChevronLeft, BookOpen } from 'lucide-react'
+import { X, Plus, Trash2, ChevronRight, ChevronLeft, BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
 import { criarTurmaAction } from '@/app/(dashboard)/turmas/actions'
 
 interface Profissional { id: string; nome: string }
@@ -16,11 +16,11 @@ interface Props {
   onCriado: (id: string, sessoes: number) => void
 }
 
-const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
-const DIAS_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const DIAS_LABEL = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const DIAS_FULL  = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
-interface SlotForm { dia_semana: number; hora_inicio: string; hora_fim: string; duracao_minutos: number; sala_id: string; profissional_id: string }
 interface PlanoForm { nome: string; frequencia_semanal: number; valor_mensal: string }
+interface DiaOverride { sala_id: string; profissional_id: string; expandido: boolean }
 
 function calcDuracao(h1: string, h2: string): number {
   const [ah, am] = h1.split(':').map(Number)
@@ -44,23 +44,23 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10))
   const [dataFim, setDataFim]     = useState('')
 
-  // Passo 2 — Slots
-  const [slots, setSlots] = useState<SlotForm[]>([
-    { dia_semana: 1, hora_inicio: '08:00', hora_fim: '09:00', duracao_minutos: 60, sala_id: '', profissional_id: '' },
-  ])
+  // Passo 2 — Horários
+  const [diasSel, setDiasSel]     = useState<number[]>([1]) // Segunda por padrão
+  const [horaInicio, setHoraInicio] = useState('08:00')
+  const [horaFim, setHoraFim]     = useState('09:00')
+  const [overrides, setOverrides] = useState<Record<number, DiaOverride>>({})
 
-  function addSlot() {
-    setSlots(prev => [...prev, { dia_semana: 2, hora_inicio: '08:00', hora_fim: '09:00', duracao_minutos: 60, sala_id: '', profissional_id: '' }])
+  function toggleDia(dia: number) {
+    setDiasSel(prev =>
+      prev.includes(dia) ? prev.filter(d => d !== dia) : [...prev, dia].sort()
+    )
   }
-  function removeSlot(i: number) { setSlots(prev => prev.filter((_, idx) => idx !== i)) }
-  function updateSlot(i: number, patch: Partial<SlotForm>) {
-    setSlots(prev => prev.map((s, idx) => {
-      if (idx !== i) return s
-      const next = { ...s, ...patch }
-      if (patch.hora_inicio || patch.hora_fim) next.duracao_minutos = calcDuracao(next.hora_inicio, next.hora_fim)
-      return next
-    }))
+
+  function updateOverride(dia: number, patch: Partial<DiaOverride>) {
+    setOverrides(prev => ({ ...prev, [dia]: { sala_id: '', profissional_id: '', expandido: false, ...prev[dia], ...patch } }))
   }
+
+  const duracao = calcDuracao(horaInicio, horaFim)
 
   // Passo 3 — Planos
   const [planos, setPlanos] = useState<PlanoForm[]>([
@@ -76,11 +76,9 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
       if (!dataInicio) return 'Informe a data de início.'
     }
     if (passo === 2) {
-      if (slots.length === 0) return 'Adicione pelo menos 1 slot.'
-      for (const s of slots) {
-        if (!s.hora_inicio || !s.hora_fim) return 'Preencha os horários de todos os slots.'
-        if (s.duracao_minutos <= 0) return 'Horário de fim deve ser após o início.'
-      }
+      if (diasSel.length === 0) return 'Selecione pelo menos 1 dia da semana.'
+      if (!horaInicio || !horaFim) return 'Preencha o horário.'
+      if (duracao <= 0) return 'O horário de fim deve ser após o início.'
     }
     if (passo === 3) {
       if (planos.length === 0) return 'Adicione pelo menos 1 plano.'
@@ -99,6 +97,17 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
     setPasso(p => p + 1)
   }
 
+  function buildSlots() {
+    return diasSel.map(dia => ({
+      dia_semana: dia,
+      hora_inicio: horaInicio,
+      hora_fim: horaFim,
+      duracao_minutos: duracao,
+      sala_id: overrides[dia]?.sala_id || null,
+      profissional_id: overrides[dia]?.profissional_id || null,
+    }))
+  }
+
   async function salvar() {
     const v = validarPasso()
     if (v) { setErr(v); return }
@@ -111,7 +120,7 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
         servico_id: servicoId || null,
         nivel, capacidade_slot: Number(capacidade),
         data_inicio: dataInicio, data_fim: dataFim || null,
-        slots: slots.map(s => ({ ...s, sala_id: s.sala_id || null, profissional_id: s.profissional_id || null })),
+        slots: buildSlots(),
         planos: planos.map(p => ({ nome: p.nome, frequencia_semanal: p.frequencia_semanal, valor_mensal: Number(p.valor_mensal) })),
       })
       if ('error' in r) { setErr(r.error); return }
@@ -205,53 +214,96 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
 
           {/* Passo 2 */}
           {passo === 2 && <>
-            <p className="text-xs text-[#7F8C8D]">Adicione todos os dias e horários disponíveis para esta turma. Os alunos poderão escolher quais slots frequentar.</p>
-            {slots.map((s, i) => (
-              <div key={i} className="bg-[#F8F9FA] rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[#4A3AE8]">Slot {i + 1}</span>
-                  {slots.length > 1 && (
-                    <button onClick={() => removeSlot(i)} className="text-[#E74C3C] hover:opacity-70"><Trash2 size={14} /></button>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="label-xs">Dia</label>
-                    <select value={s.dia_semana} onChange={e => updateSlot(i, { dia_semana: Number(e.target.value) })} className="input-base w-full">
-                      {DIAS.map((d, idx) => <option key={idx} value={idx}>{d}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label-xs">Início</label>
-                    <input type="time" value={s.hora_inicio} onChange={e => updateSlot(i, { hora_inicio: e.target.value })} className="input-base w-full" />
-                  </div>
-                  <div>
-                    <label className="label-xs">Fim</label>
-                    <input type="time" value={s.hora_fim} onChange={e => updateSlot(i, { hora_fim: e.target.value })} className="input-base w-full" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="label-xs">Sala (override)</label>
-                    <select value={s.sala_id} onChange={e => updateSlot(i, { sala_id: e.target.value })} className="input-base w-full">
-                      <option value="">Sala da turma</option>
-                      {salas.map(sl => <option key={sl.id} value={sl.id}>{sl.nome}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label-xs">Instrutor (override)</label>
-                    <select value={s.profissional_id} onChange={e => updateSlot(i, { profissional_id: e.target.value })} className="input-base w-full">
-                      <option value="">Instrutor da turma</option>
-                      {profissionais.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                    </select>
-                  </div>
-                </div>
-                {s.duracao_minutos > 0 && <p className="text-[11px] text-[#7F8C8D]">Duração: {s.duracao_minutos} minutos</p>}
+            <p className="text-xs text-[#7F8C8D]">
+              Selecione os dias e defina o horário. Um slot será criado para cada dia marcado.
+            </p>
+
+            {/* Seleção de dias */}
+            <div>
+              <label className="label-xs mb-2 block">Dias da semana *</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {DIAS_LABEL.map((label, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => toggleDia(idx)}
+                    className={`w-10 h-10 rounded-xl text-xs font-semibold transition-all ${
+                      diasSel.includes(idx)
+                        ? 'bg-[#4A3AE8] text-white shadow-sm'
+                        : 'bg-[#F0F0F0] text-[#7F8C8D] hover:bg-[#E8E8E8]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-            ))}
-            <button onClick={addSlot} className="w-full flex items-center justify-center gap-1.5 h-10 rounded-xl border-2 border-dashed border-[#4A3AE8]/30 text-[#4A3AE8] text-sm font-medium hover:border-[#4A3AE8] transition-colors">
-              <Plus size={15} /> Adicionar Slot
-            </button>
+            </div>
+
+            {/* Horário compartilhado */}
+            <div className="grid grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="label-xs">Início</label>
+                <input type="time" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} className="input-base w-full" />
+              </div>
+              <div>
+                <label className="label-xs">Fim</label>
+                <input type="time" value={horaFim} onChange={e => setHoraFim(e.target.value)} className="input-base w-full" />
+              </div>
+              <div className="pb-[3px]">
+                {duracao > 0
+                  ? <p className="text-xs text-[#4A3AE8] font-medium">{duracao} min</p>
+                  : <p className="text-xs text-red-400">Horário inválido</p>
+                }
+              </div>
+            </div>
+
+            {/* Overrides por dia */}
+            {diasSel.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] text-[#7F8C8D] uppercase tracking-wider font-semibold">
+                  {diasSel.length} slot{diasSel.length > 1 ? 's' : ''} gerado{diasSel.length > 1 ? 's' : ''}
+                  {(profId || salaId) && ' · herdam sala e instrutor da turma'}
+                </p>
+                {diasSel.map(dia => {
+                  const ov = overrides[dia]
+                  const temOverride = ov?.sala_id || ov?.profissional_id
+                  return (
+                    <div key={dia} className="bg-[#F8F9FA] rounded-xl overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => updateOverride(dia, { expandido: !ov?.expandido })}
+                        className="w-full flex items-center justify-between px-3 py-2.5 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-8 text-xs font-bold text-[#4A3AE8]">{DIAS_LABEL[dia]}</span>
+                          <span className="text-xs text-[#2C3E50]">{horaInicio}–{horaFim}</span>
+                          {temOverride && <span className="text-[10px] bg-[#4A3AE8]/10 text-[#4A3AE8] px-1.5 py-0.5 rounded-full">personalizado</span>}
+                        </div>
+                        {ov?.expandido ? <ChevronUp size={13} className="text-[#7F8C8D]" /> : <ChevronDown size={13} className="text-[#7F8C8D]" />}
+                      </button>
+                      {ov?.expandido && (
+                        <div className="px-3 pb-3 grid grid-cols-2 gap-2 border-t border-[#EBEBEB] pt-2">
+                          <div>
+                            <label className="label-xs">Sala (sobrescrever)</label>
+                            <select value={ov.sala_id} onChange={e => updateOverride(dia, { sala_id: e.target.value })} className="input-base w-full">
+                              <option value="">Sala da turma</option>
+                              {salas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label-xs">Instrutor (sobrescrever)</label>
+                            <select value={ov.profissional_id} onChange={e => updateOverride(dia, { profissional_id: e.target.value })} className="input-base w-full">
+                              <option value="">Instrutor da turma</option>
+                              {profissionais.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </>}
 
           {/* Passo 3 */}
@@ -301,14 +353,20 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#7F8C8D] uppercase tracking-wider mb-2">Slots ({slots.length})</p>
-              {slots.map((s, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm py-1.5 border-b border-[#F0F0F0]">
-                  <span className="w-8 text-[#4A3AE8] font-bold">{DIAS_ABREV[s.dia_semana]}</span>
-                  <span>{s.hora_inicio}–{s.hora_fim}</span>
-                  <span className="text-[#7F8C8D] text-xs">({s.duracao_minutos}min)</span>
-                </div>
-              ))}
+              <p className="text-xs font-semibold text-[#7F8C8D] uppercase tracking-wider mb-2">Slots ({diasSel.length})</p>
+              {diasSel.map(dia => {
+                const ov = overrides[dia]
+                return (
+                  <div key={dia} className="flex items-center gap-2 text-sm py-1.5 border-b border-[#F0F0F0]">
+                    <span className="w-8 text-[#4A3AE8] font-bold">{DIAS_LABEL[dia]}</span>
+                    <span>{horaInicio}–{horaFim}</span>
+                    <span className="text-[#7F8C8D] text-xs">({duracao}min)</span>
+                    {(ov?.sala_id || ov?.profissional_id) && (
+                      <span className="text-[10px] text-[#4A3AE8] ml-auto">personalizado</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             <div>
               <p className="text-xs font-semibold text-[#7F8C8D] uppercase tracking-wider mb-2">Planos ({planos.length})</p>

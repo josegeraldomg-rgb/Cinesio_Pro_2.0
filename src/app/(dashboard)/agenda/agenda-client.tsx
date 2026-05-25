@@ -157,7 +157,19 @@ function computarStatus(
   })
   if (ausencia) return { status: 'bloqueado' }
 
-  // 2) Verifica se está dentro de algum turno
+  // 2) Sessão de turma? Verifica antes do turno (turmas podem ser fora do horário comercial)
+  const turmaSessao = agendamentos.find(a => {
+    if (a.servicos?.tipo !== 'turma') return false
+    const id = a.profissional_id ?? (a.profissionais as any)?.id
+    if (id !== profissionalId) return false
+    if (!a.data_hora.startsWith(dataStr)) return false
+    const agIni = minFromHHMM(a.data_hora.slice(11, 16))
+    const agFim = agIni + a.duracao_minutos
+    return slotInicio < agFim && slotFim > agIni
+  })
+  if (turmaSessao) return { status: 'turma', agendamento: turmaSessao }
+
+  // 3) Verifica se está dentro de algum turno
   const turnosDoDia = turnos.filter(t =>
     t.profissional_id === profissionalId
     && t.dia_semana === diaSemana
@@ -170,7 +182,7 @@ function computarStatus(
   })
   if (!noTurno) return { status: 'fora' }
 
-  // 3) Há agendamento que colide?
+  // 4) Há agendamento que colide?
   const ags = agendamentos.filter(a => {
     const id = a.profissional_id ?? a.profissionais?.id
     if (id !== profissionalId) return false
@@ -586,17 +598,29 @@ function VisaoDia(props: {
 }) {
   const { data, profissionais, turnos, agendamentos, ausencias, feriados, mostrarCancelados, onSlotLivre, onAgendamentoClick, onEncaixe } = props
 
-  // Faixa horária dinâmica: só mostra horas em que algum profissional trabalha
+  // Faixa horária dinâmica: turnos + sessões de turma do dia
   const faixaMinutos = useMemo(() => {
+    const dataStr  = toDateStr(data)
     const diaSemana = data.getDay()
     const turnosDoDia = turnos.filter(t => t.dia_semana === diaSemana && t.ativo)
-    if (turnosDoDia.length === 0) return [] as number[]
-    const ini = Math.min(...turnosDoDia.map(t => minFromHHMM(t.hora_inicio)))
-    const fim = Math.max(...turnosDoDia.map(t => minFromHHMM(t.hora_fim)))
+    const turmasDoDia = agendamentos.filter(
+      a => a.servicos?.tipo === 'turma' && a.data_hora.startsWith(dataStr)
+    )
+    if (turnosDoDia.length === 0 && turmasDoDia.length === 0) return [] as number[]
+    const inis = [
+      ...turnosDoDia.map(t => minFromHHMM(t.hora_inicio)),
+      ...turmasDoDia.map(a => minFromHHMM(a.data_hora.slice(11, 16))),
+    ]
+    const fins = [
+      ...turnosDoDia.map(t => minFromHHMM(t.hora_fim)),
+      ...turmasDoDia.map(a => minFromHHMM(a.data_hora.slice(11, 16)) + a.duracao_minutos),
+    ]
+    const ini = Math.min(...inis)
+    const fim = Math.max(...fins)
     const lista: number[] = []
     for (let m = ini; m < fim; m += 30) lista.push(m)
     return lista
-  }, [data, turnos])
+  }, [data, turnos, agendamentos])
 
   // Grade pré-computada com rowSpan por agendamento
   const grade = useMemo(

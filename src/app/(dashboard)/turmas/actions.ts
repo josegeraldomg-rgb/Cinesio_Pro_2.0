@@ -113,47 +113,29 @@ export async function criarTurmaAction(payload: {
   if ('error' in ctx) return { error: ctx.error }
   const { admin, empresa_id } = ctx
 
-  // 1. Cria turma
-  const { data: turma, error: e1 } = await admin
-    .from('turmas')
-    .insert({ ...payload, slots: undefined, planos: undefined, empresa_id })
-    .select('id')
-    .single()
-  if (e1 || !turma) return { error: e1?.message ?? 'Erro ao criar turma.' }
-
-  // 2. Cria slots
-  const slotsInsert = payload.slots.map(s => ({ ...s, turma_id: turma.id, empresa_id }))
-  const { data: slotsData, error: e2 } = await admin.from('turma_slots').insert(slotsInsert).select('id, dia_semana, hora_inicio, duracao_minutos')
-  if (e2) return { error: e2.message }
-
-  // 3. Cria planos
-  const planosInsert = payload.planos.map(p => ({ ...p, turma_id: turma.id, empresa_id }))
-  const { error: e3 } = await admin.from('turma_planos').insert(planosInsert)
-  if (e3) return { error: e3.message }
-
-  // 4. Gera sessões automaticamente (90 dias)
-  const sessoes = gerarSessoesTurma(
-    (slotsData ?? []).map(s => ({ id: s.id, dia_semana: s.dia_semana, hora_inicio: s.hora_inicio, duracao_minutos: s.duracao_minutos })),
-    new Date(payload.data_inicio + 'T12:00:00'),
-    90,
-    payload.data_fim ? new Date(payload.data_fim + 'T12:00:00') : undefined,
-  )
-
-  if (sessoes.length > 0) {
-    const sessoesInsert = sessoes.map(s => ({
-      slot_id: s.slot_id,
-      turma_id: turma.id,
+  // Usa RPC para contornar schema cache do PostgREST
+  const { data, error } = await admin.rpc('criar_turma_completa', {
+    dados: {
       empresa_id,
-      data_hora: s.dataHora.toISOString(),
-      duracao_minutos: (slotsData ?? []).find(sl => sl.id === s.slot_id)?.duracao_minutos ?? 60,
-      status: 'agendada',
-    }))
-    const { error: e4 } = await admin.from('turma_sessoes').insert(sessoesInsert)
-    if (e4) return { error: e4.message }
-  }
+      nome: payload.nome,
+      descricao: payload.descricao ?? '',
+      profissional_id: payload.profissional_id ?? '',
+      sala_id: payload.sala_id ?? '',
+      servico_id: payload.servico_id ?? '',
+      nivel: payload.nivel,
+      capacidade_slot: payload.capacidade_slot,
+      data_inicio: payload.data_inicio,
+      data_fim: payload.data_fim ?? '',
+      observacoes: payload.observacoes ?? '',
+      slots: payload.slots,
+      planos: payload.planos,
+    },
+  })
 
+  if (error) return { error: error.message }
+  const resultado = data as { turma_id: string; sessoes_criadas: number }
   revalidate()
-  return { success: true, id: turma.id, sessoes_criadas: sessoes.length }
+  return { success: true, id: resultado.turma_id, sessoes_criadas: resultado.sessoes_criadas }
 }
 
 export async function editarTurmaAction(payload: {
@@ -174,8 +156,22 @@ export async function editarTurmaAction(payload: {
   if ('error' in ctx) return { error: ctx.error }
   const { admin, empresa_id } = ctx
 
-  const { id, ...rest } = payload
-  const { error } = await admin.from('turmas').update(rest).eq('id', id).eq('empresa_id', empresa_id)
+  // Usa RPC para contornar schema cache do PostgREST (capacidade_slot)
+  const { error } = await admin.rpc('editar_turma_fn', {
+    p_id: payload.id,
+    p_empresa_id: empresa_id,
+    p_nome: payload.nome,
+    p_descricao: payload.descricao ?? null,
+    p_profissional_id: payload.profissional_id ?? null,
+    p_sala_id: payload.sala_id ?? null,
+    p_servico_id: payload.servico_id ?? null,
+    p_nivel: payload.nivel,
+    p_capacidade_slot: payload.capacidade_slot,
+    p_data_inicio: payload.data_inicio,
+    p_data_fim: payload.data_fim ?? null,
+    p_observacoes: payload.observacoes ?? null,
+    p_ativo: payload.ativo,
+  })
   if (error) return { error: error.message }
   revalidate()
   return { success: true }

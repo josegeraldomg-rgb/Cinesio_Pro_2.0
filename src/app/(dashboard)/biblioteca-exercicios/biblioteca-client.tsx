@@ -437,6 +437,32 @@ function FilterSelect({ label, value, onChange, options }: {
   )
 }
 
+// ─── Paleta de cores por grupo muscular ──────────────────────────────────────
+
+const GRUPO_COR: Record<string, { from: string; to: string; text: string }> = {
+  'Core':            { from: '#4A3AE8', to: '#7B6FF0', text: '#4A3AE8' },
+  'Coluna':          { from: '#0EA5E9', to: '#38BDF8', text: '#0EA5E9' },
+  'MMII':            { from: '#10B981', to: '#34D399', text: '#059669' },
+  'Glúteo':          { from: '#F59E0B', to: '#FCD34D', text: '#D97706' },
+  'Quadril':         { from: '#F59E0B', to: '#FCD34D', text: '#D97706' },
+  'Ombro':           { from: '#EF4444', to: '#F87171', text: '#DC2626' },
+  'Manguito':        { from: '#EF4444', to: '#F87171', text: '#DC2626' },
+  'Diafragma':       { from: '#8B5CF6', to: '#A78BFA', text: '#7C3AED' },
+  'Pulmão':          { from: '#8B5CF6', to: '#A78BFA', text: '#7C3AED' },
+  'Isquiotibiais':   { from: '#06B6D4', to: '#67E8F9', text: '#0891B2' },
+  'Bíceps':          { from: '#F97316', to: '#FDBA74', text: '#EA580C' },
+  'Tríceps':         { from: '#F97316', to: '#FDBA74', text: '#EA580C' },
+  'Peitoral':        { from: '#EC4899', to: '#F9A8D4', text: '#DB2777' },
+  'Trapézio':        { from: '#64748B', to: '#94A3B8', text: '#475569' },
+  'Tornozelo':       { from: '#14B8A6', to: '#5EEAD4', text: '#0D9488' },
+}
+
+function getGrupoCor(grupo: string | null) {
+  if (!grupo) return { from: '#4A3AE8', to: '#7B6FF0', text: '#4A3AE8' }
+  const key = Object.keys(GRUPO_COR).find(k => grupo.includes(k))
+  return key ? GRUPO_COR[key] : { from: '#4A3AE8', to: '#7B6FF0', text: '#4A3AE8' }
+}
+
 // ─── ExercicioCard ────────────────────────────────────────────────────────────
 
 function ExercicioCard({
@@ -455,81 +481,111 @@ function ExercicioCard({
   onExcluir: () => void
 }) {
   const initials = ex.nome.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+  const cor = getGrupoCor(ex.grupo_muscular)
 
   return (
-    <div className="bg-white rounded-xl border border-[#E8E8E8] shadow-sm overflow-hidden flex flex-col">
-      {/* Imagem ou placeholder */}
-      <div className="relative h-28 bg-gradient-to-br from-[#4A3AE8]/10 to-[#7B6FF0]/10 flex items-center justify-center flex-shrink-0">
-        {ex.imagem_url ? (
+    <div className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+
+      {/* ── Área de mídia (thumbnail OU vídeo — nunca os dois) ── */}
+      <div className="relative flex-shrink-0" style={{ height: 160 }}>
+
+        {videoAberto && ex.video_url ? (
+          /* Vídeo substitui o thumbnail */
+          <VideoPlayer url={ex.video_url} height={160} />
+        ) : ex.imagem_url ? (
           <img src={ex.imagem_url} alt={ex.nome} className="w-full h-full object-cover" />
         ) : (
-          <span className="text-3xl font-bold text-[#4A3AE8]/30">{initials}</span>
+          /* Placeholder com gradiente colorido */
+          <div
+            className="w-full h-full flex flex-col items-center justify-center gap-1"
+            style={{ background: `linear-gradient(135deg, ${cor.from}18, ${cor.to}30)` }}
+          >
+            <span
+              className="text-4xl font-black tracking-tight select-none"
+              style={{ color: `${cor.from}55` }}
+            >
+              {initials}
+            </span>
+            {ex.aparelho && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: `${cor.from}20`, color: cor.text }}>
+                {ex.aparelho}
+              </span>
+            )}
+          </div>
         )}
 
-        {/* Badge sistema/empresa */}
-        <div className="absolute top-2 left-2">
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-            ex.is_sistema
-              ? 'bg-[#4A3AE8] text-white'
-              : 'bg-emerald-500 text-white'
+        {/* Badge SISTEMA / MINHA CLÍNICA */}
+        <div className="absolute top-2.5 left-2.5">
+          <span className={`text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full shadow-sm ${
+            ex.is_sistema ? 'bg-[#4A3AE8] text-white' : 'bg-emerald-500 text-white'
           }`}>
             {ex.is_sistema ? 'SISTEMA' : 'MINHA CLÍNICA'}
           </span>
         </div>
 
-        {/* Botão vídeo */}
+        {/* Botão play/fechar */}
         {ex.video_url && (
           <button
             onClick={onVideoToggle}
-            className="absolute bottom-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center transition-colors"
+            className={`absolute bottom-2.5 right-2.5 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-md transition-all ${
+              videoAberto
+                ? 'bg-white text-[#2C3E50] hover:bg-gray-100'
+                : 'bg-black/70 text-white hover:bg-black/90 backdrop-blur-sm'
+            }`}
           >
-            {videoAberto ? <X size={12} /> : <Play size={12} />}
+            {videoAberto ? <><X size={11} /> Fechar</> : <><Play size={11} fill="white" /> Assistir</>}
           </button>
         )}
       </div>
 
-      {/* Vídeo expandido */}
-      {videoAberto && ex.video_url && (
-        <div className="border-t border-[#E8E8E8]">
-          <VideoPlayer url={ex.video_url} />
-        </div>
-      )}
+      {/* ── Conteúdo ── */}
+      <div className="p-3.5 flex flex-col gap-2 flex-1">
 
-      {/* Conteúdo */}
-      <div className="p-3 flex flex-col gap-2 flex-1">
+        {/* Nome + metadados */}
         <div>
-          <p className="font-semibold text-[#2C3E50] text-sm leading-tight line-clamp-1">{ex.nome}</p>
-          <p className="text-xs text-[#7F8C8D] mt-0.5 line-clamp-1">
-            {[ex.grupo_muscular, ex.regiao_corporal, ex.aparelho].filter(Boolean).join(' · ')}
+          <p className="font-bold text-[#1A2332] text-sm leading-snug line-clamp-1">{ex.nome}</p>
+          <p className="text-[11px] text-[#7F8C8D] mt-0.5 line-clamp-1">
+            {[ex.grupo_muscular, ex.regiao_corporal].filter(Boolean).join(' · ')}
           </p>
         </div>
 
-        <div className="flex items-center gap-1 flex-wrap">
+        {/* Badges nível + séries */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           {nivelBadge(ex.nivel)}
           {ex.series_padrao && (
-            <span className="text-[10px] text-[#7F8C8D] bg-[#F8F9FA] px-1.5 py-0.5 rounded-full">
-              {ex.series_padrao}x{ex.repeticoes_padrao ?? ''}
+            <span className="text-[10px] font-medium text-[#7F8C8D] bg-[#F1F5F9] px-2 py-0.5 rounded-full">
+              {ex.series_padrao} séries · {ex.repeticoes_padrao ?? '—'}
             </span>
           )}
         </div>
 
+        {/* Objetivo */}
         {ex.objetivo && (
-          <p className="text-[11px] text-[#7F8C8D] line-clamp-2">{ex.objetivo}</p>
+          <p className="text-[11px] text-[#64748B] line-clamp-2 leading-relaxed">{ex.objetivo}</p>
         )}
 
         {/* Ações */}
-        <div className="flex items-center gap-1 mt-auto pt-2 border-t border-[#F0F0F0]">
+        <div className="flex items-center gap-1.5 mt-auto pt-2.5 border-t border-[#F1F5F9]">
           {ex.is_sistema ? (
-            <button onClick={onDuplicar} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors font-medium">
-              <Copy size={11} /> Duplicar
+            <button
+              onClick={onDuplicar}
+              className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors"
+            >
+              <Copy size={11} /> Duplicar para editar
             </button>
           ) : (
             <>
-              <button onClick={onEditar} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-[#F8F9FA] text-[#2C3E50] hover:bg-[#EDF0F2] transition-colors">
+              <button
+                onClick={onEditar}
+                className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[#F8F9FA] text-[#2C3E50] hover:bg-[#E8ECF0] transition-colors"
+              >
                 <Edit2 size={11} /> Editar
               </button>
-              <button onClick={onExcluir} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg text-red-500 hover:bg-red-50 transition-colors ml-auto">
-                <Trash2 size={11} />
+              <button
+                onClick={onExcluir}
+                className="ml-auto w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+              >
+                <Trash2 size={13} />
               </button>
             </>
           )}
@@ -541,39 +597,39 @@ function ExercicioCard({
 
 // ─── VideoPlayer ──────────────────────────────────────────────────────────────
 
-function VideoPlayer({ url }: { url: string }) {
+function VideoPlayer({ url, height = 200 }: { url: string; height?: number }) {
   const isYoutube = url.includes('youtu')
   const isVimeo = url.includes('vimeo')
 
+  const style: React.CSSProperties = { height, width: '100%', border: 'none', display: 'block' }
+
   if (isYoutube) {
     const id = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1]
-    if (!id) return <video src={url} controls className="w-full" style={{ maxHeight: 180 }} />
+    if (!id) return <video src={url} controls className="w-full" style={{ height }} />
     return (
       <iframe
-        src={`https://www.youtube.com/embed/${id}?autoplay=1`}
-        allow="autoplay; encrypted-media"
+        src={`https://www.youtube.com/embed/${id}?autoplay=1&rel=0`}
+        allow="autoplay; encrypted-media; fullscreen"
         allowFullScreen
-        className="w-full"
-        style={{ height: 180, border: 'none' }}
+        style={style}
       />
     )
   }
 
   if (isVimeo) {
     const id = url.match(/vimeo\.com\/(\d+)/)?.[1]
-    if (!id) return <video src={url} controls className="w-full" style={{ maxHeight: 180 }} />
+    if (!id) return <video src={url} controls className="w-full" style={{ height }} />
     return (
       <iframe
         src={`https://player.vimeo.com/video/${id}?autoplay=1`}
-        allow="autoplay; encrypted-media"
+        allow="autoplay; encrypted-media; fullscreen"
         allowFullScreen
-        className="w-full"
-        style={{ height: 180, border: 'none' }}
+        style={style}
       />
     )
   }
 
-  return <video src={url} controls className="w-full" style={{ maxHeight: 180 }} />
+  return <video src={url} controls className="w-full" style={{ height }} />
 }
 
 // ─── SequenciaRow ─────────────────────────────────────────────────────────────

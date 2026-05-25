@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { MessageSquare, History, FileText, Link2, Bot } from 'lucide-react'
+import { ConexaoTab } from './conexao-tab'
 
 type Aba = 'painel' | 'historico' | 'templates' | 'conexao' | 'agente-ia'
 
@@ -45,7 +46,7 @@ function EmBreve({ titulo, descricao }: { titulo: string; descricao: string }) {
 function AbasPainel()    { return <EmBreve titulo="Painel WhatsApp"    descricao="Visão geral de mensagens, automações ativas, taxa de resposta e métricas do canal." /> }
 function AbasHistorico() { return <EmBreve titulo="Histórico"          descricao="Todas as conversas com pacientes — busca, filtros por data, status e profissional." /> }
 function AbasTemplates() { return <EmBreve titulo="Templates"          descricao="Crie e gerencie mensagens reutilizáveis para lembretes, confirmações e cobranças." /> }
-function AbasConexao()   { return <EmBreve titulo="Conexão"            descricao="Conecte seu número via QR Code (WhatsApp Web) ou API oficial do WhatsApp Business." /> }
+function AbasConexao()   { return <ConexaoTab /> }
 function AbasAgenteIA()  { return <EmBreve titulo="Agente IA"         descricao="Configure um assistente inteligente para responder dúvidas, agendar e enviar confirmações automaticamente." /> }
 
 // ── Client principal ─────────────────────────────────────────────────────────

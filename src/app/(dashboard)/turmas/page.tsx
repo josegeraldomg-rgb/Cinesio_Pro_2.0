@@ -1,107 +1,103 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { Plus, Users } from 'lucide-react'
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getEmpresaId } from '@/lib/get-empresa-id'
+import { TurmasClient } from './turmas-client'
 
-const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const SELECT_SESSAO = `
+  id, slot_id, turma_id, data_hora, duracao_minutos, status, observacoes,
+  turma_slots(dia_semana, hora_inicio, salas(nome)),
+  turmas(nome)
+`.trim()
+
+const SELECT_MATRICULA = `
+  id, turma_id, paciente_id, plano_id, data_matricula, data_saida, status, observacoes,
+  pacientes(nome, telefone),
+  turmas(nome),
+  turma_planos(nome, frequencia_semanal, valor_mensal)
+`.trim()
 
 export default async function TurmasPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { empresaId } = await getEmpresaId()
+  const admin = createAdminClient()
 
-  const { data: usuario } = await supabase.from('usuarios').select('empresa_id').eq('id', user.id).single()
+  const hoje = new Date()
+  const janelaInicio = new Date(hoje); janelaInicio.setDate(hoje.getDate() - 7)
+  const janelaFim    = new Date(hoje); janelaFim.setDate(hoje.getDate() + 90)
 
-  const { data: turmas } = await supabase
-    .from('turmas')
-    .select('*, profissionais(nome), salas(nome), turma_alunos(count)')
-    .eq('empresa_id', usuario?.empresa_id)
-    .eq('ativo', true)
-    .order('dia_semana')
+  const [
+    { data: turmasRaw },
+    { data: slotsRaw },
+    { data: planosRaw },
+    { data: matriculasRaw },
+    { data: matriculaSlots },
+    { data: sessoesRaw },
+    { data: profissionais },
+    { data: salas },
+    { data: servicos },
+    { data: pacientes },
+  ] = await Promise.all([
+    admin.from('turmas')
+      .select('id, nome, descricao, profissional_id, sala_id, servico_id, nivel, capacidade_maxima_por_slot, data_inicio, data_fim, ativo, observacoes, profissionais(nome), salas(nome)')
+      .eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
 
-  const nivelBadge: Record<string, 'info' | 'warning' | 'danger'> = {
-    iniciante: 'info',
-    intermediario: 'warning',
-    avancado: 'danger',
+    admin.from('turma_slots')
+      .select('id, turma_id, dia_semana, hora_inicio, hora_fim, duracao_minutos, sala_id, profissional_id, capacidade_maxima, ativo')
+      .eq('empresa_id', empresaId),
+
+    admin.from('turma_planos')
+      .select('id, turma_id, nome, frequencia_semanal, valor_mensal')
+      .eq('empresa_id', empresaId),
+
+    admin.from('turma_matriculas')
+      .select(SELECT_MATRICULA)
+      .eq('empresa_id', empresaId)
+      .order('data_matricula', { ascending: false }),
+
+    admin.from('turma_matricula_slots')
+      .select('matricula_id, slot_id')
+      .eq('empresa_id', empresaId),
+
+    admin.from('turma_sessoes')
+      .select(SELECT_SESSAO)
+      .eq('empresa_id', empresaId)
+      .gte('data_hora', janelaInicio.toISOString())
+      .lte('data_hora', janelaFim.toISOString())
+      .order('data_hora'),
+
+    admin.from('profissionais').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    admin.from('salas').select('id, nome').eq('empresa_id', empresaId),
+    admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    admin.from('pacientes').select('id, nome, telefone').eq('empresa_id', empresaId).eq('status', 'ativo').order('nome'),
+  ])
+
+  // Montar slots_ids por matrícula
+  const slotsByMatricula: Record<string, string[]> = {}
+  for (const ms of (matriculaSlots ?? [])) {
+    if (!slotsByMatricula[ms.matricula_id]) slotsByMatricula[ms.matricula_id] = []
+    slotsByMatricula[ms.matricula_id].push(ms.slot_id)
   }
 
+  // Enriquecer turmas com seus slots e planos
+  const turmas = (turmasRaw ?? []).map((t: any) => ({
+    ...t,
+    slots: (slotsRaw ?? []).filter((s: any) => s.turma_id === t.id),
+    planos: (planosRaw ?? []).filter((p: any) => p.turma_id === t.id),
+  }))
+
+  // Enriquecer matrículas com slots_ids
+  const matriculas = (matriculasRaw ?? []).map((m: any) => ({
+    ...m,
+    slots_ids: slotsByMatricula[m.id] ?? [],
+  }))
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-[#7F8C8D] text-sm">{turmas?.length ?? 0} turmas ativas</p>
-        <Button>
-          <Plus size={16} />
-          Nova Turma
-        </Button>
-      </div>
-
-      {turmas && turmas.length > 0 ? (
-        <div className="grid grid-cols-3 gap-4">
-          {turmas.map((turma: any) => {
-            const alunos = turma.turma_alunos?.[0]?.count || 0
-            const ocupacao = turma.capacidade_maxima > 0
-              ? Math.round((alunos / turma.capacidade_maxima) * 100)
-              : 0
-
-            return (
-              <Card key={turma.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-[#2C3E50]">{turma.nome}</h3>
-                    <p className="text-xs text-[#7F8C8D] mt-0.5">{turma.profissionais?.nome}</p>
-                  </div>
-                  <Badge variant={nivelBadge[turma.nivel] || 'info'}>
-                    {turma.nivel === 'iniciante' ? 'Iniciante' :
-                     turma.nivel === 'intermediario' ? 'Intermediário' : 'Avançado'}
-                  </Badge>
-                </div>
-
-                <div className="space-y-2 text-sm text-[#7F8C8D]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#2C3E50] font-medium">
-                      {DIAS_SEMANA[turma.dia_semana || 0]}
-                    </span>
-                    <span>{turma.hora_inicio} – {turma.hora_fim}</span>
-                  </div>
-                  {turma.salas?.nome && (
-                    <p className="text-xs">📍 {turma.salas.nome}</p>
-                  )}
-                </div>
-
-                <div className="mt-4">
-                  <div className="flex justify-between mb-1">
-                    <div className="flex items-center gap-1 text-xs text-[#7F8C8D]">
-                      <Users size={12} />
-                      <span>{alunos}/{turma.capacidade_maxima} alunos</span>
-                    </div>
-                    <span className="text-xs font-semibold text-[#2C3E50]">{ocupacao}%</span>
-                  </div>
-                  <div className="h-1.5 bg-[#E8E8E8] rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${ocupacao >= 90 ? 'bg-[#E74C3C]' : ocupacao >= 70 ? 'bg-[#F39C12]' : 'bg-[#27AE60]'}`}
-                      style={{ width: `${ocupacao}%` }}
-                    />
-                  </div>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
-      ) : (
-        <Card>
-          <div className="text-center py-16 text-[#7F8C8D]">
-            <Users size={40} className="mx-auto mb-3 opacity-20" />
-            <p className="font-medium">Nenhuma turma cadastrada</p>
-            <p className="text-sm mt-1">Crie a primeira turma de Pilates</p>
-            <Button className="mt-4">
-              <Plus size={14} />
-              Criar Turma
-            </Button>
-          </div>
-        </Card>
-      )}
-    </div>
+    <TurmasClient
+      turmas={turmas as any}
+      matriculas={matriculas as any}
+      sessoes={(sessoesRaw ?? []) as any}
+      profissionais={profissionais ?? []}
+      salas={salas ?? []}
+      servicos={servicos ?? []}
+      pacientes={pacientes ?? []}
+    />
   )
 }

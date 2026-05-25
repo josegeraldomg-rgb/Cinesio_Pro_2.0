@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useTransition } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Filter, Dumbbell, ListOrdered, FileText, Edit2, Trash2, Copy, Play, X, ChevronDown, Maximize2, Minimize2, Info } from 'lucide-react'
 import type { ExercicioBiblioteca, SequenciaBiblioteca, PlanoExercicio } from './actions'
 import {
@@ -378,14 +379,16 @@ export function BibliotecaClient({ exerciciosIniciais, sequenciasIniciais, plano
       )}
 
       {/* ── Modais ────────────────────────────────────────────────────────────── */}
-      {exDetalhe && (
-        <ExercicioDetalheModal
-          ex={exDetalhe}
-          onClose={() => setExDetalhe(null)}
-          onEditar={exDetalhe.is_sistema ? undefined : () => { setExDetalhe(null); setExFormModal({ ex: exDetalhe }) }}
-          onDuplicar={exDetalhe.is_sistema ? () => { setExDetalhe(null); duplicarExercicio(exDetalhe) } : undefined}
-        />
-      )}
+      <AnimatePresence>
+        {exDetalhe && (
+          <ExercicioDetalheModal
+            ex={exDetalhe}
+            onClose={() => setExDetalhe(null)}
+            onEditar={exDetalhe.is_sistema ? undefined : () => { setExDetalhe(null); setExFormModal({ ex: exDetalhe }) }}
+            onDuplicar={exDetalhe.is_sistema ? () => { setExDetalhe(null); duplicarExercicio(exDetalhe) } : undefined}
+          />
+        )}
+      </AnimatePresence>
 
       {exFormModal !== null && (
         <ExercicioFormModal
@@ -498,84 +501,64 @@ function ExercicioCard({
 }) {
   const initials = ex.nome.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
   const cor = getGrupoCor(ex.grupo_muscular)
-
-  // Imagem: imagem própria > thumbnail YouTube > placeholder
   const thumbnail = ex.imagem_url
     || (ex.video_url?.includes('youtu') ? getYoutubeThumbnail(ex.video_url) : null)
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group">
-
-      {/* ── Área de mídia clicável ── */}
-      <div
-        className="relative flex-shrink-0 cursor-pointer"
-        style={{ height: 160 }}
-        onClick={onExpandir}
-      >
+    <motion.div
+      layoutId={`card-${ex.id}`}
+      onClick={onExpandir}
+      className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-lg cursor-pointer overflow-hidden flex flex-col group"
+      style={{ borderRadius: 16 }}
+      whileHover={{ y: -2, boxShadow: '0 12px 40px rgba(74,58,232,0.13)' }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+    >
+      {/* ── Mídia ── */}
+      <motion.div layoutId={`card-media-${ex.id}`} className="relative flex-shrink-0" style={{ height: 160 }}>
         {thumbnail ? (
           <>
-            <img
-              src={thumbnail}
-              alt={ex.nome}
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
-            {/* Overlay escuro no hover */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                <Play size={20} className="text-[#4A3AE8] ml-0.5" fill="#4A3AE8" />
+            <img src={thumbnail} alt={ex.nome} className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
+              <div className="opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 w-12 h-12 rounded-full bg-white/95 flex items-center justify-center shadow-xl">
+                <Play size={20} fill="#4A3AE8" className="text-[#4A3AE8] ml-0.5" />
               </div>
             </div>
           </>
         ) : (
-          /* Placeholder com gradiente colorido */
-          <div
-            className="w-full h-full flex flex-col items-center justify-center gap-2"
-            style={{ background: `linear-gradient(135deg, ${cor.from}18, ${cor.to}30)` }}
-          >
-            <span className="text-4xl font-black tracking-tight select-none" style={{ color: `${cor.from}55` }}>
-              {initials}
-            </span>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 relative"
+            style={{ background: `linear-gradient(135deg, ${cor.from}18, ${cor.to}30)` }}>
+            <span className="text-4xl font-black select-none" style={{ color: `${cor.from}55` }}>{initials}</span>
             {ex.aparelho && (
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: `${cor.from}20`, color: cor.text }}>
-                {ex.aparelho}
-              </span>
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                style={{ background: `${cor.from}20`, color: cor.text }}>{ex.aparelho}</span>
             )}
-            {/* Hover play sem vídeo */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <Info size={20} style={{ color: cor.from }} />
-              </div>
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/8 transition-colors flex items-center justify-center">
+              <Info size={22} className="opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: cor.from }} />
             </div>
           </div>
         )}
-
-        {/* Badge SISTEMA / MINHA CLÍNICA */}
-        <div className="absolute top-2.5 left-2.5">
+        <motion.div layoutId={`card-badge-${ex.id}`} className="absolute top-2.5 left-2.5">
           <span className={`text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full shadow-sm ${
-            ex.is_sistema ? 'bg-[#4A3AE8] text-white' : 'bg-emerald-500 text-white'
-          }`}>
+            ex.is_sistema ? 'bg-[#4A3AE8] text-white' : 'bg-emerald-500 text-white'}`}>
             {ex.is_sistema ? 'SISTEMA' : 'MINHA CLÍNICA'}
           </span>
-        </div>
-
-        {/* Ícone de vídeo disponível */}
+        </motion.div>
         {ex.video_url && (
           <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1 bg-black/60 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
             <Play size={9} fill="white" /> Vídeo
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* ── Conteúdo ── */}
-      <div className="p-3.5 flex flex-col gap-2 flex-1">
-        <div className="cursor-pointer" onClick={onExpandir}>
+      <motion.div layoutId={`card-body-${ex.id}`} className="p-3.5 flex flex-col gap-2 flex-1">
+        <div>
           <p className="font-bold text-[#1A2332] text-sm leading-snug line-clamp-1 group-hover:text-[#4A3AE8] transition-colors">{ex.nome}</p>
           <p className="text-[11px] text-[#7F8C8D] mt-0.5 line-clamp-1">
             {[ex.grupo_muscular, ex.regiao_corporal].filter(Boolean).join(' · ')}
           </p>
         </div>
-
         <div className="flex items-center gap-1.5 flex-wrap">
           {nivelBadge(ex.nivel)}
           {ex.series_padrao && (
@@ -584,38 +567,28 @@ function ExercicioCard({
             </span>
           )}
         </div>
-
-        {ex.objetivo && (
-          <p className="text-[11px] text-[#64748B] line-clamp-2 leading-relaxed">{ex.objetivo}</p>
-        )}
-
-        <div className="flex items-center gap-1.5 mt-auto pt-2.5 border-t border-[#F1F5F9]">
+        {ex.objetivo && <p className="text-[11px] text-[#64748B] line-clamp-2 leading-relaxed">{ex.objetivo}</p>}
+        <div className="flex items-center gap-1.5 mt-auto pt-2.5 border-t border-[#F1F5F9]" onClick={e => e.stopPropagation()}>
           {ex.is_sistema ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDuplicar() }}
-              className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors"
-            >
+            <button onClick={onDuplicar}
+              className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors">
               <Copy size={11} /> Duplicar para editar
             </button>
           ) : (
             <>
-              <button
-                onClick={(e) => { e.stopPropagation(); onEditar() }}
-                className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[#F8F9FA] text-[#2C3E50] hover:bg-[#E8ECF0] transition-colors"
-              >
+              <button onClick={onEditar}
+                className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[#F8F9FA] text-[#2C3E50] hover:bg-[#E8ECF0] transition-colors">
                 <Edit2 size={11} /> Editar
               </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onExcluir() }}
-                className="ml-auto w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-              >
+              <button onClick={onExcluir}
+                className="ml-auto w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
                 <Trash2 size={13} />
               </button>
             </>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -635,175 +608,155 @@ function ExercicioDetalheModal({
   const [maximizado, setMaximizado] = useState(false)
   const [videoAtivo, setVideoAtivo] = useState(false)
   const cor = getGrupoCor(ex.grupo_muscular)
-
   const thumbnail = ex.imagem_url
     || (ex.video_url?.includes('youtu') ? getYoutubeThumbnail(ex.video_url) : null)
-
-  const videoH = maximizado ? 480 : 320
+  const videoH = maximizado ? 480 : 340
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className={`bg-white flex flex-col overflow-hidden transition-all duration-300 ${
-          maximizado
-            ? 'fixed inset-2 rounded-2xl'
-            : 'relative w-full max-w-2xl rounded-2xl max-h-[90vh]'
-        }`}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#F1F5F9] flex-shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-              ex.is_sistema ? 'bg-[#4A3AE8] text-white' : 'bg-emerald-500 text-white'
-            }`}>
-              {ex.is_sistema ? 'SISTEMA' : 'MINHA CLÍNICA'}
-            </span>
-            <h2 className="font-bold text-[#1A2332] text-base truncate">{ex.nome}</h2>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-            <button
-              onClick={() => setMaximizado(v => !v)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F1F5F9] transition-colors"
-              title={maximizado ? 'Restaurar' : 'Maximizar'}
-            >
-              {maximizado ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-            </button>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F1F5F9] transition-colors"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        </div>
+    <>
+      {/* Backdrop */}
+      <motion.div
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      />
 
-        {/* Área de vídeo / imagem */}
-        <div className="relative flex-shrink-0 bg-black" style={{ height: videoH }}>
-          {videoAtivo && ex.video_url ? (
-            <VideoPlayer url={ex.video_url} height={videoH} />
-          ) : thumbnail ? (
-            <div className="relative w-full h-full">
-              <img src={thumbnail} alt={ex.nome} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+      {/* Modal — usa os mesmos layoutIds do card → animação contínua */}
+      <div className={`fixed z-50 flex items-center justify-center ${maximizado ? 'inset-2' : 'inset-4 md:inset-x-[15%] md:inset-y-[5%]'}`}>
+        <motion.div
+          layoutId={`card-${ex.id}`}
+          className="bg-white flex flex-col w-full h-full overflow-hidden"
+          style={{ borderRadius: 20 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#F1F5F9] flex-shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <motion.span layoutId={`card-badge-${ex.id}`}
+                className={`text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                  ex.is_sistema ? 'bg-[#4A3AE8] text-white' : 'bg-emerald-500 text-white'}`}>
+                {ex.is_sistema ? 'SISTEMA' : 'MINHA CLÍNICA'}
+              </motion.span>
+              <h2 className="font-bold text-[#1A2332] text-base truncate">{ex.nome}</h2>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+              <button onClick={() => { setMaximizado(v => !v); setVideoAtivo(false) }}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F1F5F9] transition-colors"
+                title={maximizado ? 'Restaurar' : 'Maximizar'}>
+                {maximizado ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              </button>
+              <button onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F1F5F9] transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Mídia */}
+          <motion.div layoutId={`card-media-${ex.id}`} className="relative flex-shrink-0 bg-black" style={{ height: videoH }}>
+            {videoAtivo && ex.video_url ? (
+              <VideoPlayer url={ex.video_url} height={videoH} />
+            ) : thumbnail ? (
+              <div className="relative w-full h-full">
+                <img src={thumbnail} alt={ex.nome} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+                  {ex.video_url ? (
+                    <motion.button
+                      onClick={() => setVideoAtivo(true)}
+                      className="flex items-center gap-3 bg-white/95 hover:bg-white text-[#1A2332] font-bold px-7 py-3.5 rounded-full shadow-2xl text-sm"
+                      whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }}
+                    >
+                      <Play size={20} fill="#4A3AE8" className="text-[#4A3AE8]" /> Assistir vídeo
+                    </motion.button>
+                  ) : (
+                    <span className="text-white/50 text-sm">Sem vídeo</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-4"
+                style={{ background: `linear-gradient(135deg, ${cor.from}25, ${cor.to}40)` }}>
                 {ex.video_url ? (
-                  <button
-                    onClick={() => setVideoAtivo(true)}
-                    className="flex items-center gap-3 bg-white/95 hover:bg-white text-[#1A2332] font-bold px-6 py-3 rounded-full shadow-xl text-sm transition-all hover:scale-105"
-                  >
-                    <Play size={18} fill="#4A3AE8" className="text-[#4A3AE8]" />
-                    Assistir vídeo
-                  </button>
+                  <motion.button onClick={() => setVideoAtivo(true)}
+                    className="flex items-center gap-3 bg-white/95 hover:bg-white font-bold px-7 py-3.5 rounded-full shadow-2xl text-sm"
+                    style={{ color: cor.from }} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }}>
+                    <Play size={20} fill={cor.from} style={{ color: cor.from }} /> Assistir vídeo
+                  </motion.button>
                 ) : (
-                  <span className="text-white/60 text-sm">Sem vídeo</span>
+                  <span className="text-7xl font-black" style={{ color: `${cor.from}35` }}>
+                    {ex.nome.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
+                  </span>
                 )}
               </div>
-            </div>
-          ) : (
-            /* Sem imagem nem thumbnail */
-            <div
-              className="w-full h-full flex flex-col items-center justify-center gap-3"
-              style={{ background: `linear-gradient(135deg, ${cor.from}25, ${cor.to}40)` }}
-            >
-              {ex.video_url ? (
-                <button
-                  onClick={() => setVideoAtivo(true)}
-                  className="flex items-center gap-3 bg-white/95 hover:bg-white font-bold px-6 py-3 rounded-full shadow-xl text-sm transition-all hover:scale-105"
-                  style={{ color: cor.from }}
-                >
-                  <Play size={18} fill={cor.from} style={{ color: cor.from }} />
-                  Assistir vídeo
-                </button>
-              ) : (
-                <span className="text-6xl font-black" style={{ color: `${cor.from}40` }}>
-                  {ex.nome.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
-                </span>
+            )}
+          </motion.div>
+
+          {/* Conteúdo scrollável */}
+          <motion.div layoutId={`card-body-${ex.id}`} className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              {nivelBadge(ex.nivel)}
+              {ex.aparelho && (
+                <span className="text-[11px] font-medium px-2.5 py-1 rounded-full"
+                  style={{ background: `${cor.from}15`, color: cor.text }}>{ex.aparelho}</span>
+              )}
+              {ex.regiao_corporal && (
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F1F5F9] text-[#64748B] font-medium">{ex.regiao_corporal}</span>
+              )}
+              {ex.grupo_muscular && (
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F1F5F9] text-[#64748B] font-medium">{ex.grupo_muscular}</span>
               )}
             </div>
-          )}
-        </div>
+            {ex.objetivo && (
+              <div>
+                <p className="text-[11px] font-semibold text-[#7F8C8D] uppercase tracking-wider mb-1.5">Objetivo</p>
+                <p className="text-sm text-[#2C3E50] leading-relaxed">{ex.objetivo}</p>
+              </div>
+            )}
+            {(ex.series_padrao || ex.repeticoes_padrao) && (
+              <div className="grid grid-cols-2 gap-3">
+                {ex.series_padrao && (
+                  <div className="bg-[#F8F9FA] rounded-xl p-4 text-center">
+                    <p className="text-3xl font-black" style={{ color: cor.from }}>{ex.series_padrao}</p>
+                    <p className="text-[11px] text-[#7F8C8D] font-medium mt-1">Séries</p>
+                  </div>
+                )}
+                {ex.repeticoes_padrao && (
+                  <div className="bg-[#F8F9FA] rounded-xl p-4 text-center">
+                    <p className="text-2xl font-black leading-tight" style={{ color: cor.from }}>{ex.repeticoes_padrao}</p>
+                    <p className="text-[11px] text-[#7F8C8D] font-medium mt-1">Repetições</p>
+                  </div>
+                )}
+              </div>
+            )}
+            {ex.descricao && (
+              <div>
+                <p className="text-[11px] font-semibold text-[#7F8C8D] uppercase tracking-wider mb-1.5">Execução</p>
+                <p className="text-sm text-[#2C3E50] leading-relaxed">{ex.descricao}</p>
+              </div>
+            )}
+          </motion.div>
 
-        {/* Detalhes */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Badges */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {nivelBadge(ex.nivel)}
-            {ex.aparelho && (
-              <span className="text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ background: `${cor.from}15`, color: cor.text }}>
-                {ex.aparelho}
-              </span>
+          {/* Rodapé */}
+          <div className="flex items-center gap-2 px-5 py-4 border-t border-[#F1F5F9] bg-[#FAFAFA] flex-shrink-0">
+            {onDuplicar && (
+              <button onClick={onDuplicar}
+                className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors">
+                <Copy size={13} /> Duplicar para editar
+              </button>
             )}
-            {ex.regiao_corporal && (
-              <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F1F5F9] text-[#64748B] font-medium">
-                {ex.regiao_corporal}
-              </span>
+            {onEditar && (
+              <button onClick={onEditar}
+                className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-[#4A3AE8] text-white hover:bg-[#3829c7] transition-colors">
+                <Edit2 size={13} /> Editar exercício
+              </button>
             )}
-            {ex.grupo_muscular && (
-              <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F1F5F9] text-[#64748B] font-medium">
-                {ex.grupo_muscular}
-              </span>
-            )}
+            <button onClick={onClose} className="ml-auto text-sm text-[#7F8C8D] hover:text-[#2C3E50] px-3 py-2">Fechar</button>
           </div>
-
-          {/* Objetivo */}
-          {ex.objetivo && (
-            <div>
-              <p className="text-[11px] font-semibold text-[#7F8C8D] uppercase tracking-wider mb-1">Objetivo</p>
-              <p className="text-sm text-[#2C3E50]">{ex.objetivo}</p>
-            </div>
-          )}
-
-          {/* Prescrição padrão */}
-          {(ex.series_padrao || ex.repeticoes_padrao) && (
-            <div className="grid grid-cols-2 gap-3">
-              {ex.series_padrao && (
-                <div className="bg-[#F8F9FA] rounded-xl p-3 text-center">
-                  <p className="text-2xl font-black text-[#4A3AE8]">{ex.series_padrao}</p>
-                  <p className="text-[11px] text-[#7F8C8D] font-medium mt-0.5">Séries</p>
-                </div>
-              )}
-              {ex.repeticoes_padrao && (
-                <div className="bg-[#F8F9FA] rounded-xl p-3 text-center">
-                  <p className="text-2xl font-black text-[#4A3AE8] leading-tight">{ex.repeticoes_padrao}</p>
-                  <p className="text-[11px] text-[#7F8C8D] font-medium mt-0.5">Repetições</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Descrição / instruções */}
-          {ex.descricao && (
-            <div>
-              <p className="text-[11px] font-semibold text-[#7F8C8D] uppercase tracking-wider mb-1">Execução</p>
-              <p className="text-sm text-[#2C3E50] leading-relaxed">{ex.descricao}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Rodapé com ações */}
-        <div className="flex items-center gap-2 px-5 py-3.5 border-t border-[#F1F5F9] bg-[#FAFAFA] flex-shrink-0">
-          {onDuplicar && (
-            <button
-              onClick={onDuplicar}
-              className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors"
-            >
-              <Copy size={13} /> Duplicar para editar
-            </button>
-          )}
-          {onEditar && (
-            <button
-              onClick={onEditar}
-              className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-[#4A3AE8] text-white hover:bg-[#3829c7] transition-colors"
-            >
-              <Edit2 size={13} /> Editar exercício
-            </button>
-          )}
-          <button onClick={onClose} className="ml-auto text-sm text-[#7F8C8D] hover:text-[#2C3E50] transition-colors px-3 py-2">
-            Fechar
-          </button>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </>
   )
 }
 

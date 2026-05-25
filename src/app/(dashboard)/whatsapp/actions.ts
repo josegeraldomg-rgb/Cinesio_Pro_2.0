@@ -4,9 +4,8 @@ import { getEmpresaId } from '@/lib/get-empresa-id'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 // ─── Env vars ────────────────────────────────────────────────────────────────
-const UAZAPI_URL          = process.env.UAZAPI_URL          ?? ''
-const UAZAPI_ADMIN_TOKEN  = process.env.UAZAPI_ADMIN_TOKEN  ?? ''
-const APP_URL             = process.env.NEXT_PUBLIC_APP_URL ?? ''
+const UAZAPI_URL          = process.env.UAZAPI_URL         ?? ''
+const UAZAPI_ADMIN_TOKEN  = process.env.UAZAPI_ADMIN_TOKEN ?? ''
 
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
 export interface WaConfig {
@@ -268,15 +267,13 @@ export async function excluirInstanciaWaAction(): Promise<{ success: true } | { 
 export async function configurarWebhookWaAction(): Promise<{ success: true } | { error: string }> {
   try {
     if (!isConfigured()) return { error: 'UAZAPI não configurado.' }
-    if (!APP_URL)        return { error: 'NEXT_PUBLIC_APP_URL não definida.' }
 
     const { empresaId } = await getEmpresaId()
     const cfg = await getConfig(empresaId)
     if (!cfg) return { error: 'Nenhuma instância encontrada.' }
 
-    const webhookUrl = `${APP_URL}/api/webhook/uazapi`
+    // A UAZAPI não exige URL de webhook externo — apenas sincroniza a configuração
     await uazapiInstance(cfg.instance_token, '/webhook', 'POST', {
-      url:    webhookUrl,
       events: ['messages', 'connection', 'messages_update', 'message.ack'],
     })
 

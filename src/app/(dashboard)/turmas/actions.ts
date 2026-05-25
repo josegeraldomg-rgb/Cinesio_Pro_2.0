@@ -379,6 +379,56 @@ export async function registrarChamadaAction(payload: {
   return { success: true, presentes }
 }
 
+// ─── Busca turma completa (para PDF) ─────────────────────────────────────────
+
+export async function buscarTurmaComMatriculasAction(turmaId: string): Promise<
+  { turma: Turma; matriculas: Matricula[] } | { error: string }
+> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { data: turmaRaw, error: e1 } = await admin
+    .from('turmas')
+    .select('id, nome, descricao, profissional_id, sala_id, servico_id, nivel, capacidade_slot, data_inicio, data_fim, ativo, observacoes, profissionais(nome), salas(nome)')
+    .eq('id', turmaId)
+    .eq('empresa_id', empresa_id)
+    .single()
+
+  if (e1 || !turmaRaw) return { error: e1?.message ?? 'Turma não encontrada.' }
+
+  const [{ data: slots }, { data: planos }, { data: matriculasRaw }] = await Promise.all([
+    admin.from('turma_slots').select('id, turma_id, dia_semana, hora_inicio, hora_fim, duracao_minutos, sala_id, profissional_id, capacidade_maxima, ativo').eq('turma_id', turmaId).eq('empresa_id', empresa_id).order('dia_semana'),
+    admin.from('turma_planos').select('id, turma_id, nome, frequencia_semanal, valor_mensal').eq('turma_id', turmaId).eq('empresa_id', empresa_id).order('frequencia_semanal'),
+    admin.from('turma_matriculas').select('id, turma_id, paciente_id, plano_id, data_matricula, data_saida, status, observacoes, pacientes(nome, telefone), turmas(nome), turma_planos(nome, frequencia_semanal, valor_mensal)').eq('turma_id', turmaId).eq('empresa_id', empresa_id),
+  ])
+
+  // Busca os slot_ids de cada matrícula
+  const matriculasIds = (matriculasRaw ?? []).map(m => m.id)
+  const { data: matSlots } = matriculasIds.length > 0
+    ? await admin.from('turma_matricula_slots').select('matricula_id, slot_id').in('matricula_id', matriculasIds)
+    : { data: [] }
+
+  const slotsPorMat: Record<string, string[]> = {}
+  for (const ms of (matSlots ?? [])) {
+    if (!slotsPorMat[ms.matricula_id]) slotsPorMat[ms.matricula_id] = []
+    slotsPorMat[ms.matricula_id].push(ms.slot_id)
+  }
+
+  const turma: Turma = {
+    ...(turmaRaw as any),
+    slots: (slots ?? []) as TurmaSlot[],
+    planos: (planos ?? []) as TurmaPlano[],
+  }
+
+  const matriculas: Matricula[] = (matriculasRaw ?? []).map((m: any) => ({
+    ...m,
+    slots_ids: slotsPorMat[m.id] ?? [],
+  }))
+
+  return { turma, matriculas }
+}
+
 // ─── Cobrança mensal ─────────────────────────────────────────────────────────
 
 export async function gerarCobrancasMensaisAction(mesAno: string): Promise<

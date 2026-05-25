@@ -12,6 +12,8 @@ import { NovoEncaixeModal } from '@/components/agenda/novo-encaixe-modal'
 import type { EntradaListaEspera } from './lista-espera-actions'
 import type { FormaPagamento } from '@/app/(dashboard)/financeiro/actions'
 import type { ComissaoConfig } from '@/lib/financeiro/calcular-comissao'
+import { buscarTurmaComMatriculasAction } from '@/app/(dashboard)/turmas/actions'
+import { gerarPdfTurma } from '@/lib/turma-pdf'
 
 type Tab = 'agenda' | 'ausencias' | 'feriados' | 'historico' | 'lista-espera'
 
@@ -101,6 +103,12 @@ export function AgendaPageClient(props: Props) {
     setEncaixeAberto(true)
   }
 
+  async function handleTurmaClick(turmaId: string) {
+    const result = await buscarTurmaComMatriculasAction(turmaId)
+    if ('error' in result) { alert(result.error); return }
+    gerarPdfTurma(result.turma, result.matriculas)
+  }
+
   // ausencias já vêm filtradas (sem tipo='feriado') do page.tsx
   const ausencias = props.ausencias
 
@@ -174,6 +182,7 @@ export function AgendaPageClient(props: Props) {
             inicioSemana={props.inicioSemana}
             onNovoAgendamento={abrirModal}
             onEncaixe={abrirEncaixe}
+            onTurmaClick={handleTurmaClick}
             formasPagamento={props.formasPagamento}
             comissoes={props.comissoes}
           />

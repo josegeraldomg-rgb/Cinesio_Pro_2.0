@@ -16,6 +16,7 @@ import type { ComissaoConfig } from '@/lib/financeiro/calcular-comissao'
 // ─────────────────────────────────────────────────────────────────
 interface Agendamento {
   id: string
+  turma_id?: string | null
   data_hora: string
   duracao_minutos: number
   status: string
@@ -47,6 +48,7 @@ interface Props {
   inicioSemana: string
   onNovoAgendamento: (inicial?: InicialAgendamento) => void
   onEncaixe?: (inicial?: { profissionalId?: string; data?: string; hora?: string }) => void
+  onTurmaClick?: (turmaId: string) => void
   formasPagamento: FormaPagamento[]
   comissoes: ComissaoConfig[]
 }
@@ -212,7 +214,7 @@ function computarStatus(
 // ═════════════════════════════════════════════════════════════════
 export function AgendaClient({
   agendamentosIniciais, profissionais, salas, pacientes, turnos, ausencias, feriados,
-  onNovoAgendamento, onEncaixe, formasPagamento, comissoes,
+  onNovoAgendamento, onEncaixe, onTurmaClick, formasPagamento, comissoes,
 }: Props) {
   const [data, setData]               = useState<Date>(() => new Date())
   const [view, setView]               = useState<'dia' | 'semana'>('dia')
@@ -375,6 +377,7 @@ export function AgendaClient({
             onNovoAgendamento({ profissionalId: profId, data: dataStr, hora })
           }
           onAgendamentoClick={abrirDetalhe}
+          onTurmaClick={onTurmaClick}
           onEncaixe={onEncaixe}
         />
 
@@ -405,6 +408,7 @@ export function AgendaClient({
         feriados={feriados}
         mostrarCancelados={mostrarCancelados}
         onAgendamentoClick={abrirDetalhe}
+        onTurmaClick={onTurmaClick}
       />
 
       {detalheModal}
@@ -594,9 +598,10 @@ function VisaoDia(props: {
   agendamentos: Agendamento[]; ausencias: Ausencia[]; feriados: Feriado[]; mostrarCancelados: boolean
   onSlotLivre: (profissionalId: string, data: string, hora: string) => void
   onAgendamentoClick: (ag: Agendamento) => void
+  onTurmaClick?: (turmaId: string) => void
   onEncaixe?: (ini?: { profissionalId?: string; data?: string; hora?: string }) => void
 }) {
-  const { data, profissionais, turnos, agendamentos, ausencias, feriados, mostrarCancelados, onSlotLivre, onAgendamentoClick, onEncaixe } = props
+  const { data, profissionais, turnos, agendamentos, ausencias, feriados, mostrarCancelados, onSlotLivre, onAgendamentoClick, onTurmaClick, onEncaixe } = props
 
   // Faixa horária dinâmica: turnos + sessões de turma do dia
   const faixaMinutos = useMemo(() => {
@@ -689,6 +694,7 @@ function VisaoDia(props: {
                   const alturaMin = rowSpan * 40
 
                   const ehClicavel = ehLivre || (!!agendamento && !ehTurma)
+                  const ehTurmaClicavel = ehTurma && !!agendamento?.turma_id && !!onTurmaClick
 
                   return (
                     <td key={p.id} rowSpan={rowSpan} className="px-2 py-1 align-top">
@@ -696,12 +702,13 @@ function VisaoDia(props: {
                         type="button"
                         onClick={() => {
                           if (ehLivre) onSlotLivre(p.id, toDateStr(data), hora)
+                          else if (ehTurmaClicavel) onTurmaClick!(agendamento!.turma_id!)
                           else if (agendamento && !ehTurma) onAgendamentoClick(agendamento)
                         }}
                         className={`w-full text-left rounded-lg px-3 py-2 border transition-all ${
-                          ehClicavel
+                          ehClicavel || ehTurmaClicavel
                             ? 'cursor-pointer hover:shadow-md hover:scale-[1.01]'
-                            : ehTurma ? 'cursor-default' : 'cursor-default'
+                            : 'cursor-default'
                         }`}
                         style={{
                           background: styles.bg,
@@ -762,8 +769,9 @@ function VisaoSemana(props: {
   data: Date; profissionais: ProfTipo[]; turnos: Turno[]
   agendamentos: Agendamento[]; ausencias: Ausencia[]; feriados: Feriado[]; mostrarCancelados: boolean
   onAgendamentoClick: (ag: Agendamento) => void
+  onTurmaClick?: (turmaId: string) => void
 }) {
-  const { data, profissionais, turnos, agendamentos, ausencias, feriados, mostrarCancelados, onAgendamentoClick } = props
+  const { data, profissionais, turnos, agendamentos, ausencias, feriados, mostrarCancelados, onAgendamentoClick, onTurmaClick } = props
 
   // Semana segunda → domingo a partir da data
   const inicioSemana = useMemo(() => {
@@ -852,8 +860,16 @@ function VisaoSemana(props: {
                     key={ag.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => onAgendamentoClick(ag)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onAgendamentoClick(ag) }}
+                    onClick={() => {
+                      if (ag.servicos?.tipo === 'turma' && ag.turma_id && onTurmaClick) onTurmaClick(ag.turma_id)
+                      else onAgendamentoClick(ag)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        if (ag.servicos?.tipo === 'turma' && ag.turma_id && onTurmaClick) onTurmaClick(ag.turma_id)
+                        else onAgendamentoClick(ag)
+                      }
+                    }}
                     className="rounded-md px-2 py-1.5 border text-[11px] cursor-pointer hover:shadow-sm transition-shadow"
                     style={{ background: styles.bg, borderColor: styles.border }}
                     title={`${hora} · ${ag.pacientes?.nome ?? ''} · ${ag.servicos?.nome ?? ''}`}

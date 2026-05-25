@@ -151,6 +151,7 @@ export default async function AgendaPage() {
     if (!prof) return []     // profissional inativo ou não carregado
     return [{
       id: `turma::${ts.id}`,
+      turma_id: ts.turma_id,
       data_hora: ts.data_hora,
       duracao_minutos: ts.duracao_minutos,
       status: ts.status === 'realizada' ? 'realizado' : 'agendado',

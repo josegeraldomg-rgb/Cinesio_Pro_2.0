@@ -77,6 +77,7 @@ export default async function AgendaPage() {
     { data: formasPagamento },
     { data: comissoesRaw },
     { data: listaEsperaRaw },
+    { data: turmasSessoesRaw },
     catalog,
   ] = await Promise.all([
     admin.from('agendamentos')
@@ -101,6 +102,14 @@ export default async function AgendaPage() {
     admin.from('comissoes_config')
       .select('id, profissional_id, servico_id, percentual, ativo')
       .eq('empresa_id', empresaId).eq('ativo', true),
+
+    admin.from('turma_sessoes')
+      .select('id, slot_id, turma_id, data_hora, duracao_minutos, status, turmas(nome, profissional_id), turma_slots(profissional_id, salas(nome))')
+      .eq('empresa_id', empresaId)
+      .neq('status', 'cancelada')
+      .gte('data_hora', janelaInicio.toISOString())
+      .lte('data_hora', janelaFim.toISOString())
+      .order('data_hora'),
 
     admin.from('lista_espera_clinica')
       .select(`id, paciente_id, servico_id, profissional_id,
@@ -134,9 +143,30 @@ export default async function AgendaPage() {
     created_at: row.created_at,
   }))
 
+  // Converte sessões de turma para o mesmo formato de agendamento
+  const sessoesComoAgendamentos = (turmasSessoesRaw ?? []).flatMap((ts: any) => {
+    const profId = ts.turma_slots?.profissional_id ?? ts.turmas?.profissional_id
+    if (!profId) return []   // sem profissional → não aparece na grade
+    const prof = (catalog.profissionais ?? []).find((p: any) => p.id === profId)
+    if (!prof) return []     // profissional inativo ou não carregado
+    return [{
+      id: `turma::${ts.id}`,
+      data_hora: ts.data_hora,
+      duracao_minutos: ts.duracao_minutos,
+      status: ts.status === 'realizada' ? 'realizado' : 'agendado',
+      pacientes: { nome: ts.turmas?.nome ?? 'Turma' },
+      profissionais: { id: prof.id, nome: prof.nome, cor_agenda: prof.cor_agenda },
+      profissional_id: profId,
+      servicos: { nome: 'Aula Coletiva', tipo: 'turma' },
+      salas: ts.turma_slots?.salas ?? null,
+    }]
+  })
+
+  const todosAgendamentos = [...(agendamentosJanela ?? []), ...sessoesComoAgendamentos]
+
   return (
     <AgendaPageClient
-      agendamentosSemana={agendamentosJanela ?? []}
+      agendamentosSemana={todosAgendamentos}
       historico={(historico ?? []) as any}
       profissionais={catalog.profissionais ?? []}
       salas={catalog.salas ?? []}

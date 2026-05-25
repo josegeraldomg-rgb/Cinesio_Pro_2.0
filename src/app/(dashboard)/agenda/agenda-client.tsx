@@ -51,7 +51,7 @@ interface Props {
   comissoes: ComissaoConfig[]
 }
 
-type StatusSlot = 'livre' | 'ocupado' | 'bloqueado' | 'encaixe' | 'cancelado' | 'atendido' | 'fora'
+type StatusSlot = 'livre' | 'ocupado' | 'bloqueado' | 'encaixe' | 'cancelado' | 'atendido' | 'fora' | 'turma'
 
 // ─────────────────────────────────────────────────────────────────
 // Paleta de cores por status do slot
@@ -63,6 +63,7 @@ const STATUS_STYLES: Record<StatusSlot, { bg: string; border: string; dot: strin
   encaixe:    { bg: '#E67E2218', border: '#E67E2240', dot: '#E67E22', text: '#a85916', label: 'Encaixe' },
   cancelado:  { bg: '#E74C3C18', border: '#E74C3C40', dot: '#E74C3C', text: '#a93423', label: 'Cancelado' },
   atendido:   { bg: '#1f8b4d22', border: '#1f8b4d50', dot: '#1f8b4d', text: '#1f8b4d', label: 'Atendido' },
+  turma:      { bg: '#7C3AED18', border: '#7C3AED45', dot: '#7C3AED', text: '#5B21B6', label: 'Turma' },
   fora:       { bg: 'transparent',  border: 'transparent', dot: '#fff',   text: '#BDC3C7', label: '' },
 }
 
@@ -185,6 +186,7 @@ function computarStatus(
   if (ags.length > 1) return { status: 'encaixe', agendamento: ags[0] }
 
   const ag = ags[0]
+  if (ag.servicos?.tipo === 'turma') return { status: 'turma', agendamento: ag }
   if (ag.status === 'cancelado') {
     if (!mostrarCancelados) return { status: 'livre' }
     return { status: 'cancelado', agendamento: ag }
@@ -489,7 +491,7 @@ function Toolbar(props: {
 // Legenda
 // ═════════════════════════════════════════════════════════════════
 function Legenda() {
-  const itens: StatusSlot[] = ['livre', 'ocupado', 'bloqueado', 'encaixe', 'cancelado', 'atendido']
+  const itens: StatusSlot[] = ['livre', 'ocupado', 'turma', 'bloqueado', 'encaixe', 'cancelado', 'atendido']
   return (
     <div className="flex items-center gap-4 flex-wrap text-xs">
       {itens.map(s => (
@@ -547,7 +549,7 @@ function buildGrade(
       // Só aplica rowSpan para status com agendamento único (não encaixe).
       if (
         r.agendamento &&
-        (r.status === 'ocupado' || r.status === 'atendido' || r.status === 'cancelado')
+        (r.status === 'ocupado' || r.status === 'atendido' || r.status === 'cancelado' || r.status === 'turma')
       ) {
         const agIni = minFromHHMM(r.agendamento.data_hora.slice(11, 16))
         const agFim = agIni + r.agendamento.duracao_minutos
@@ -651,8 +653,9 @@ function VisaoDia(props: {
                   if (celula.tipo === 'pular') return null
 
                   const { status, rowSpan, agendamento, hora } = celula
-                  const styles  = STATUS_STYLES[status]
-                  const ehLivre = status === 'livre'
+                  const styles   = STATUS_STYLES[status]
+                  const ehLivre  = status === 'livre'
+                  const ehTurma  = status === 'turma'
 
                   if (status === 'fora') {
                     return <td key={p.id} rowSpan={rowSpan} className="px-3 py-2" />
@@ -661,7 +664,7 @@ function VisaoDia(props: {
                   // Altura proporcional à duração: cada slot de 30 min tem ~40px
                   const alturaMin = rowSpan * 40
 
-                  const ehClicavel = ehLivre || !!agendamento
+                  const ehClicavel = ehLivre || (!!agendamento && !ehTurma)
 
                   return (
                     <td key={p.id} rowSpan={rowSpan} className="px-2 py-1 align-top">
@@ -669,12 +672,12 @@ function VisaoDia(props: {
                         type="button"
                         onClick={() => {
                           if (ehLivre) onSlotLivre(p.id, toDateStr(data), hora)
-                          else if (agendamento) onAgendamentoClick(agendamento)
+                          else if (agendamento && !ehTurma) onAgendamentoClick(agendamento)
                         }}
                         className={`w-full text-left rounded-lg px-3 py-2 border transition-all ${
                           ehClicavel
                             ? 'cursor-pointer hover:shadow-md hover:scale-[1.01]'
-                            : 'cursor-default'
+                            : ehTurma ? 'cursor-default' : 'cursor-default'
                         }`}
                         style={{
                           background: styles.bg,
@@ -682,24 +685,32 @@ function VisaoDia(props: {
                           minHeight: `${alturaMin - 8}px`,
                         }}
                         title={
-                          agendamento
-                            ? `${agendamento.pacientes?.nome} · ${agendamento.servicos?.nome}`
-                            : ehLivre ? 'Clique para criar agendamento' : styles.label
+                          ehTurma && agendamento
+                            ? `Turma: ${agendamento.pacientes?.nome}`
+                            : agendamento
+                              ? `${agendamento.pacientes?.nome} · ${agendamento.servicos?.nome}`
+                              : ehLivre ? 'Clique para criar agendamento' : styles.label
                         }
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: styles.dot }} />
+                          {ehTurma
+                            ? <span className="text-[11px] flex-shrink-0" style={{ color: styles.dot }}>●●</span>
+                            : <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: styles.dot }} />
+                          }
                           <span className="font-semibold truncate" style={{ color: styles.text }}>
                             {agendamento
                               ? agendamento.pacientes?.nome ?? hora
                               : `${hora} às ${hhmmFromMin(min + 30)}`}
                           </span>
                         </div>
-                        {agendamento?.servicos?.nome && (
-                          <p className="text-[10px] mt-0.5 truncate opacity-70" style={{ color: styles.text }}>
-                            {agendamento.servicos.nome}
-                          </p>
-                        )}
+                        {ehTurma
+                          ? <p className="text-[10px] mt-0.5 truncate opacity-80" style={{ color: styles.text }}>Aula coletiva</p>
+                          : agendamento?.servicos?.nome && (
+                            <p className="text-[10px] mt-0.5 truncate opacity-70" style={{ color: styles.text }}>
+                              {agendamento.servicos.nome}
+                            </p>
+                          )
+                        }
                         {rowSpan > 1 && agendamento && (
                           <p className="text-[10px] mt-1 opacity-50" style={{ color: styles.text }}>
                             {agendamento.duracao_minutos} min
@@ -757,6 +768,7 @@ function VisaoSemana(props: {
   }
 
   function statusDoAgendamento(ag: Agendamento): StatusSlot {
+    if (ag.servicos?.tipo === 'turma') return 'turma'
     if (ag.status === 'cancelado') return 'cancelado'
     if (ag.status === 'realizado') return 'atendido'
     return 'ocupado'

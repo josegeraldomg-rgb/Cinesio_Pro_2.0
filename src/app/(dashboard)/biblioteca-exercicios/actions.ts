@@ -92,15 +92,30 @@ export async function listarExerciciosBibliotecaAction(filtros?: FiltrosExercici
   if ('error' in ctx) return { error: ctx.error }
   const { admin, empresa_id } = ctx
 
-  // Busca exercícios da empresa + exercícios do sistema (empresa_id IS NULL)
-  let query = admin
-    .from('biblioteca_exercicios')
-    .select('id, empresa_id, is_sistema, nome, descricao, grupo_muscular, nivel, objetivo, regiao_corporal, aparelho, duracao_segundos, series_padrao, repeticoes_padrao, imagem_url, video_url')
-    .or(`empresa_id.eq.${empresa_id},is_sistema.eq.true`)
-    .order('nome')
+  const COLS = 'id, empresa_id, is_sistema, nome, descricao, grupo_muscular, nivel, objetivo, regiao_corporal, aparelho, duracao_segundos, series_padrao, repeticoes_padrao, imagem_url, video_url'
 
-  const { data, error } = await query
-  if (error) return { error: error.message }
+  // Busca em duas consultas separadas para evitar edge-cases do .or() com is_sistema
+  const [resEmpresa, resSistema] = await Promise.all([
+    admin.from('biblioteca_exercicios').select(COLS).eq('empresa_id', empresa_id).order('nome'),
+    admin.from('biblioteca_exercicios').select(COLS).eq('is_sistema', true).order('nome'),
+  ])
+
+  if (resEmpresa.error) return { error: resEmpresa.error.message }
+  if (resSistema.error) return { error: resSistema.error.message }
+
+  // Merge: sistema primeiro, depois próprios; sem duplicatas
+  const idsEmpresa = new Set((resEmpresa.data ?? []).map((e: any) => e.id))
+  const merged = [
+    ...(resSistema.data ?? []),
+    ...(resEmpresa.data ?? []).filter((e: any) => !idsEmpresa.has(e.id) || true), // próprios sempre incluídos
+  ]
+  // Remove duplicatas que vieram dos dois lados (exercício do sistema duplicado para empresa)
+  const seen = new Set<string>()
+  const data = merged.filter((e: any) => {
+    if (seen.has(e.id)) return false
+    seen.add(e.id)
+    return true
+  })
 
   let exercicios = (data ?? []) as ExercicioBiblioteca[]
 
@@ -257,17 +272,26 @@ export async function listarSequenciasBibliotecaAction(): Promise<
   if ('error' in ctx) return { error: ctx.error }
   const { admin, empresa_id } = ctx
 
-  // Busca sequências da empresa + sequências do sistema (empresa_id IS NULL)
-  const { data, error } = await admin
-    .from('sequencias_aula')
-    .select('id, empresa_id, is_sistema, nome, descricao, exercicios, criado_em')
-    .or(`empresa_id.eq.${empresa_id},is_sistema.eq.true`)
-    .order('nome')
+  // Busca em duas consultas separadas para evitar edge-cases do .or() com is_sistema
+  const COLS = 'id, empresa_id, is_sistema, nome, descricao, exercicios, criado_em'
+  const [resEmpresa, resSistema] = await Promise.all([
+    admin.from('sequencias_aula').select(COLS).eq('empresa_id', empresa_id).order('nome'),
+    admin.from('sequencias_aula').select(COLS).eq('is_sistema', true).order('nome'),
+  ])
 
-  if (error) return { error: error.message }
+  if (resEmpresa.error) return { error: resEmpresa.error.message }
+  if (resSistema.error) return { error: resSistema.error.message }
+
+  // Merge sem duplicatas, sistema primeiro
+  const seen = new Set<string>()
+  const rawData = [...(resSistema.data ?? []), ...(resEmpresa.data ?? [])].filter((s: any) => {
+    if (seen.has(s.id)) return false
+    seen.add(s.id)
+    return true
+  })
 
   // Sistema primeiro, depois próprias
-  const sequencias = ((data ?? []) as SequenciaBiblioteca[]).sort((a, b) => {
+  const sequencias = (rawData as SequenciaBiblioteca[]).sort((a, b) => {
     if (a.is_sistema && !b.is_sistema) return -1
     if (!a.is_sistema && b.is_sistema) return 1
     return a.nome.localeCompare(b.nome, 'pt-BR')

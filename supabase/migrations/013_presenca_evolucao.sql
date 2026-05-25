@@ -27,16 +27,58 @@ CREATE TABLE IF NOT EXISTS sequencias_aula (
   criado_em  timestamptz NOT NULL DEFAULT now()
 );
 
--- 3. Extender turma_sessoes
-ALTER TABLE turma_sessoes
-  ADD COLUMN IF NOT EXISTS sequencia_id    uuid REFERENCES sequencias_aula(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS evolucao_padrao text;
+-- 3. Extender turma_sessoes (só se a coluna não existir)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'turma_sessoes' AND column_name = 'sequencia_id'
+  ) THEN
+    ALTER TABLE turma_sessoes
+      ADD COLUMN sequencia_id uuid REFERENCES sequencias_aula(id) ON DELETE SET NULL;
+  END IF;
 
--- 4. Extender turma_presencas
-ALTER TABLE turma_presencas
-  ADD COLUMN IF NOT EXISTS evolucao_individual text;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'turma_sessoes' AND column_name = 'evolucao_padrao'
+  ) THEN
+    ALTER TABLE turma_sessoes ADD COLUMN evolucao_padrao text;
+  END IF;
+END $$;
 
--- 5. Créditos de reposição (previsto em schema.sql, garante existência)
+-- 4. Extender turma_presencas — adicionar evolucao_individual
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'turma_presencas' AND column_name = 'evolucao_individual'
+  ) THEN
+    ALTER TABLE turma_presencas ADD COLUMN evolucao_individual text;
+  END IF;
+END $$;
+
+-- 5. Atualizar CHECK constraint de status em turma_presencas para incluir novos valores
+--    (presente, faltou, justificado além dos originais)
+DO $$
+DECLARE
+  constraint_name text;
+BEGIN
+  SELECT conname INTO constraint_name
+  FROM pg_constraint
+  WHERE conrelid = 'turma_presencas'::regclass
+    AND contype = 'c'
+    AND pg_get_constraintdef(oid) LIKE '%status%';
+
+  IF constraint_name IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE turma_presencas DROP CONSTRAINT ' || quote_ident(constraint_name);
+  END IF;
+
+  ALTER TABLE turma_presencas
+    ADD CONSTRAINT turma_presencas_status_check
+    CHECK (status IN ('presente','faltou','justificado','falta','falta_justificada'));
+END $$;
+
+-- 6. Créditos de reposição
 CREATE TABLE IF NOT EXISTS creditos_reposicao (
   id             uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
   empresa_id     uuid        NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,

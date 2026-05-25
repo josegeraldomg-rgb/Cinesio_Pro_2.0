@@ -224,13 +224,12 @@ export async function salvarPresencaEvolucaoAction(payload: {
   const horasDesde = (Date.now() - new Date(sessaoCheck.data_hora).getTime()) / 3_600_000
   if (horasDesde > travasHoras) return { error: 'Sessão travada para edição.' }
 
-  // Upsert turma_presencas
+  // Upsert turma_presencas (sem turma_id — coluna não existe na tabela)
   const presencasInsert = payload.presencas
     .filter(p => p.status !== '')
     .map(p => ({
       empresa_id,
       sessao_id: payload.sessao_id,
-      turma_id: payload.turma_id,
       paciente_id: p.paciente_id,
       status: p.status,
       evolucao_individual: p.evolucao_individual || null,

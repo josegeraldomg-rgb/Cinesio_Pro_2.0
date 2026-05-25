@@ -93,7 +93,7 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
                 <div className="space-y-1.5">
                   {t.slots.filter(s => s.ativo).map(s => {
                     const alunosNoSlot = turmaMatriculas.filter(m => (m.slots_ids ?? []).includes(s.id)).length
-                    const cap = s.capacidade_maxima ?? t.capacidade_maxima_por_slot
+                    const cap = s.capacidade_maxima ?? t.capacidade_slot
                     const pct = cap > 0 ? Math.round((alunosNoSlot / cap) * 100) : 0
                     const corBarra = pct >= 90 ? '#E74C3C' : pct >= 70 ? '#E67E22' : '#27AE60'
                     return (

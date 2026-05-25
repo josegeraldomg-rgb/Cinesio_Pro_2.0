@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS turmas (
   servico_id                uuid        REFERENCES servicos(id) ON DELETE SET NULL,
   nivel                     text        NOT NULL DEFAULT 'livre'
                                         CHECK (nivel IN ('iniciante','intermediario','avancado','livre')),
-  capacidade_maxima_por_slot int        NOT NULL DEFAULT 10,
+  capacidade_slot int        NOT NULL DEFAULT 10,
   data_inicio               date        NOT NULL,
   data_fim                  date,
   ativo                     boolean     NOT NULL DEFAULT true,

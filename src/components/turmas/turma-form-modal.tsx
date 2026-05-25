@@ -109,7 +109,7 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
         profissional_id: profId || null,
         sala_id: salaId || null,
         servico_id: servicoId || null,
-        nivel, capacidade_maxima_por_slot: Number(capacidade),
+        nivel, capacidade_slot: Number(capacidade),
         data_inicio: dataInicio, data_fim: dataFim || null,
         slots: slots.map(s => ({ ...s, sala_id: s.sala_id || null, profissional_id: s.profissional_id || null })),
         planos: planos.map(p => ({ nome: p.nome, frequencia_semanal: p.frequencia_semanal, valor_mensal: Number(p.valor_mensal) })),

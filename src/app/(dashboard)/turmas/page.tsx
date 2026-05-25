@@ -36,7 +36,7 @@ export default async function TurmasPage() {
     { data: pacientes },
   ] = await Promise.all([
     admin.from('turmas')
-      .select('id, nome, descricao, profissional_id, sala_id, servico_id, nivel, capacidade_maxima_por_slot, data_inicio, data_fim, ativo, observacoes, profissionais(nome), salas(nome)')
+      .select('id, nome, descricao, profissional_id, sala_id, servico_id, nivel, capacidade_slot, data_inicio, data_fim, ativo, observacoes, profissionais(nome), salas(nome)')
       .eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
 
     admin.from('turma_slots')

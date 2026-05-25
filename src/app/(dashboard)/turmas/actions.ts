@@ -36,7 +36,7 @@ export interface Turma {
   sala_id: string | null
   servico_id: string | null
   nivel: string
-  capacidade_maxima_por_slot: number
+  capacidade_slot: number
   data_inicio: string
   data_fim: string | null
   ativo: boolean
@@ -102,7 +102,7 @@ export async function criarTurmaAction(payload: {
   sala_id?: string | null
   servico_id?: string | null
   nivel: string
-  capacidade_maxima_por_slot: number
+  capacidade_slot: number
   data_inicio: string
   data_fim?: string | null
   observacoes?: string | null
@@ -164,7 +164,7 @@ export async function editarTurmaAction(payload: {
   sala_id?: string | null
   servico_id?: string | null
   nivel: string
-  capacidade_maxima_por_slot: number
+  capacidade_slot: number
   data_inicio: string
   data_fim?: string | null
   observacoes?: string | null
@@ -293,8 +293,8 @@ export async function matricularAlunoAction(payload: {
 
   // Verifica capacidade de cada slot
   for (const slot_id of payload.slot_ids) {
-    const { data: slot } = await admin.from('turma_slots').select('capacidade_maxima, turmas(capacidade_maxima_por_slot)').eq('id', slot_id).single()
-    const cap = slot?.capacidade_maxima ?? (slot?.turmas as any)?.capacidade_maxima_por_slot ?? 10
+    const { data: slot } = await admin.from('turma_slots').select('capacidade_maxima, turmas(capacidade_slot)').eq('id', slot_id).single()
+    const cap = slot?.capacidade_maxima ?? (slot?.turmas as any)?.capacidade_slot ?? 10
     const { count } = await admin.from('turma_matricula_slots')
       .select('id', { count: 'exact', head: true })
       .eq('slot_id', slot_id)

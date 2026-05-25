@@ -7,6 +7,9 @@ import type { InicialAgendamento } from '@/components/agenda/novo-agendamento/no
 import { AgendamentoDetalheModal, type AgendamentoDetalhe } from '@/components/agenda/agendamento-detalhe-modal'
 import { NotificacaoVagaModal } from '@/components/agenda/notificacao-vaga-modal'
 import { buscarCompativeisListaEsperaAction, type EntradaListaEspera } from './lista-espera-actions'
+import { CheckoutFinanceiroModal, type DadosCheckout } from '@/components/financeiro/checkout-financeiro-modal'
+import type { FormaPagamento } from '@/app/(dashboard)/financeiro/actions'
+import type { ComissaoConfig } from '@/lib/financeiro/calcular-comissao'
 
 // ─────────────────────────────────────────────────────────────────
 // Tipos
@@ -44,6 +47,8 @@ interface Props {
   inicioSemana: string
   onNovoAgendamento: (inicial?: InicialAgendamento) => void
   onEncaixe?: (inicial?: { profissionalId?: string; data?: string; hora?: string }) => void
+  formasPagamento: FormaPagamento[]
+  comissoes: ComissaoConfig[]
 }
 
 type StatusSlot = 'livre' | 'ocupado' | 'bloqueado' | 'encaixe' | 'cancelado' | 'atendido' | 'fora'
@@ -192,7 +197,8 @@ function computarStatus(
 // Component principal
 // ═════════════════════════════════════════════════════════════════
 export function AgendaClient({
-  agendamentosIniciais, profissionais, salas, pacientes, turnos, ausencias, feriados, onNovoAgendamento, onEncaixe,
+  agendamentosIniciais, profissionais, salas, pacientes, turnos, ausencias, feriados,
+  onNovoAgendamento, onEncaixe, formasPagamento, comissoes,
 }: Props) {
   const [data, setData]               = useState<Date>(() => new Date())
   const [view, setView]               = useState<'dia' | 'semana'>('dia')
@@ -202,6 +208,7 @@ export function AgendaClient({
   const [agendamentoAberto, setAgendamentoAberto] = useState<AgendamentoDetalhe | null>(null)
   const [vagasCompativeis, setVagasCompativeis] = useState<EntradaListaEspera[]>([])
   const [slotVago, setSlotVago] = useState<{ data: string; hora: string; profNome?: string } | null>(null)
+  const [checkoutDados, setCheckoutDados] = useState<DadosCheckout | null>(null)
 
   function navegar(delta: number) {
     const d = new Date(data)
@@ -222,6 +229,27 @@ export function AgendaClient({
   }
 
   async function handleStatusChange(id: string, novoStatus: string) {
+    // "Realizado" abre o checkout financeiro antes de persistir o status
+    if (novoStatus === 'realizado' && formasPagamento.length > 0) {
+      const ag = agendamentos.find(a => a.id === id) ?? agendamentosIniciais.find(a => a.id === id)
+      if (ag) {
+        const valorBase = ag.valor ?? ag.servicos?.valor ?? 0
+        setCheckoutDados({
+          agendamento_id:     id,
+          paciente_id:        ag.paciente_id ?? null,
+          paciente_nome:      ag.pacientes?.nome ?? 'Paciente',
+          profissional_id:    ag.profissional_id ?? ag.profissionais?.id ?? null,
+          profissional_nome:  ag.profissionais?.nome ?? '—',
+          servico_id:         null,
+          servico_nome:       ag.servicos?.nome ?? '—',
+          valor_base:         typeof valorBase === 'number' ? valorBase : 0,
+          data_competencia:   ag.data_hora.slice(0, 10),
+        })
+        setAgendamentoAberto(null)
+        return   // espera o checkout confirmar
+      }
+    }
+
     setAgendamentos(ags => ags.map(a => a.id === id ? { ...a, status: novoStatus } : a))
     if (agendamentoAberto?.id === id) {
       setAgendamentoAberto(prev => prev ? { ...prev, status: novoStatus } : null)
@@ -282,6 +310,21 @@ export function AgendaClient({
     />
   ) : null
 
+  const checkoutModal = checkoutDados ? (
+    <CheckoutFinanceiroModal
+      dados={checkoutDados}
+      formasPagamento={formasPagamento}
+      comissoes={comissoes}
+      onClose={() => setCheckoutDados(null)}
+      onConfirmado={() => {
+        setCheckoutDados(null)
+        setAgendamentos(ags => ags.map(a =>
+          a.id === checkoutDados.agendamento_id ? { ...a, status: 'realizado' } : a
+        ))
+      }}
+    />
+  ) : null
+
   const notificacaoModal = slotVago && vagasCompativeis.length > 0 ? (
     <NotificacaoVagaModal
       entradas={vagasCompativeis}
@@ -323,6 +366,7 @@ export function AgendaClient({
 
         {detalheModal}
         {notificacaoModal}
+        {checkoutModal}
         <BotaoFlutuante onClick={() => onNovoAgendamento()} />
       </div>
     )
@@ -351,6 +395,7 @@ export function AgendaClient({
 
       {detalheModal}
       {notificacaoModal}
+      {checkoutModal}
       <BotaoFlutuante onClick={() => onNovoAgendamento()} />
     </div>
   )

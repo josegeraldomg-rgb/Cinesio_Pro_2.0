@@ -10,6 +10,8 @@ import { ListaEsperaAba } from '@/components/agenda/lista-espera-aba'
 import { NovoAgendamentoModal, type InicialAgendamento } from '@/components/agenda/novo-agendamento/novo-agendamento-modal'
 import { NovoEncaixeModal } from '@/components/agenda/novo-encaixe-modal'
 import type { EntradaListaEspera } from './lista-espera-actions'
+import type { FormaPagamento } from '@/app/(dashboard)/financeiro/actions'
+import type { ComissaoConfig } from '@/lib/financeiro/calcular-comissao'
 
 type Tab = 'agenda' | 'ausencias' | 'feriados' | 'historico' | 'lista-espera'
 
@@ -75,6 +77,8 @@ interface Props {
   turnos: Turno[]
   inicioSemana: string
   listaEspera: EntradaListaEspera[]
+  formasPagamento: FormaPagamento[]
+  comissoes: ComissaoConfig[]
 }
 
 export function AgendaPageClient(props: Props) {
@@ -170,6 +174,8 @@ export function AgendaPageClient(props: Props) {
             inicioSemana={props.inicioSemana}
             onNovoAgendamento={abrirModal}
             onEncaixe={abrirEncaixe}
+            formasPagamento={props.formasPagamento}
+            comissoes={props.comissoes}
           />
         )}
 

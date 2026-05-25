@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, X, Calendar, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react'
+import { Search, X, Calendar, CheckCircle2, Clock, XCircle, AlertCircle, Download } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { AgendamentoHist, Profissional, Servico } from '@/app/(dashboard)/agenda/agenda-page-client'
+import * as XLSX from 'xlsx'
 
 interface Props {
   agendamentos: AgendamentoHist[]
@@ -25,6 +26,28 @@ const STATUS_META: Record<string, { label: string; cor: string; bg: string; Icon
 function fmtDataHora(iso: string) {
   const d = new Date(iso)
   return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function exportarXlsx(filtrados: AgendamentoHist[]) {
+  const linhas = filtrados.map(a => ({
+    'Data/Hora':      fmtDataHora(a.data_hora),
+    'Duração (min)':  a.duracao_minutos,
+    'Paciente':       a.pacientes?.nome ?? '',
+    'Profissional':   a.profissionais?.nome ?? '',
+    'Serviço':        a.servicos?.nome ?? '',
+    'Sala':           a.salas?.nome ?? '',
+    'Status':         STATUS_META[a.status]?.label ?? a.status,
+    'Observações':    a.observacoes ?? '',
+  }))
+  const ws = XLSX.utils.json_to_sheet(linhas)
+  // Larguras de coluna automáticas
+  ws['!cols'] = [
+    { wch: 18 }, { wch: 14 }, { wch: 28 }, { wch: 24 },
+    { wch: 24 }, { wch: 16 }, { wch: 16 }, { wch: 40 },
+  ]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Histórico')
+  XLSX.writeFile(wb, `historico_${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
 
 export function HistoricoAba({ agendamentos, profissionais, servicos }: Props) {
@@ -151,24 +174,36 @@ export function HistoricoAba({ agendamentos, profissionais, servicos }: Props) {
         </div>
       </div>
 
-      {/* Estatísticas */}
-      <div className="flex items-center gap-3 flex-wrap text-xs">
-        <span className="text-[#7F8C8D]">
-          <strong className="text-[#2C3E50]">{stats.total}</strong> atendimento{stats.total === 1 ? '' : 's'}
-        </span>
-        {Object.entries(stats.por_status).map(([status, count]) => {
-          const meta = STATUS_META[status]
-          if (!meta) return null
-          return (
-            <span
-              key={status}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold"
-              style={{ color: meta.cor, background: meta.bg }}
-            >
-              {meta.label}: {count}
-            </span>
-          )
-        })}
+      {/* Estatísticas + Exportar */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap text-xs">
+          <span className="text-[#7F8C8D]">
+            <strong className="text-[#2C3E50]">{stats.total}</strong> atendimento{stats.total === 1 ? '' : 's'}
+          </span>
+          {Object.entries(stats.por_status).map(([status, count]) => {
+            const meta = STATUS_META[status]
+            if (!meta) return null
+            return (
+              <span
+                key={status}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold"
+                style={{ color: meta.cor, background: meta.bg }}
+              >
+                {meta.label}: {count}
+              </span>
+            )
+          })}
+        </div>
+
+        {filtrados.length > 0 && (
+          <button
+            onClick={() => exportarXlsx(filtrados)}
+            className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[#27AE60] text-white text-xs font-semibold hover:bg-[#219653] transition-colors shadow-sm"
+          >
+            <Download size={13} />
+            Exportar Excel
+          </button>
+        )}
       </div>
 
       {/* Tabela */}

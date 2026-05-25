@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { getEmpresaId } from '@/lib/get-empresa-id'
 import {
   Users, TrendingUp, FileText, Sparkles,
   Plus, DollarSign, ClipboardList, CheckCircle2, Clock, XCircle, AlertCircle
@@ -12,17 +12,8 @@ import { formatCurrency, formatDateTime, STATUS_LABELS, STATUS_COLORS } from '@/
 import Link from 'next/link'
 
 export default async function DashboardPage() {
+  const { usuario, empresaId } = await getEmpresaId()
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: usuario } = await supabase
-    .from('usuarios')
-    .select('empresa_id, nome')
-    .eq('id', user.id)
-    .single()
-
-  const empresaId = usuario?.empresa_id
   const hoje = new Date().toISOString().split('T')[0]
 
   // Buscar dados em paralelo

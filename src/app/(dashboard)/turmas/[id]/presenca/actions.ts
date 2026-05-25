@@ -134,18 +134,19 @@ export async function buscarSessaoPresencaAction(sessaoId: string): Promise<
     .select('id, paciente_id, pacientes(nome, telefone, ddi)')
     .eq('turma_id', sessao.turma_id)
     .eq('empresa_id', empresa_id)
-    .eq('status', 'ativa')
-    .order('pacientes(nome)' as any)
+    .eq('status', 'ativo')   // constraint: 'ativo' | 'pausado' | 'encerrado'
 
-  const alunos: PresencaAluno[] = (matriculas ?? []).map((m: any) => ({
-    matricula_id: m.id,
-    paciente_id: m.paciente_id,
-    paciente_nome: m.pacientes?.nome ?? 'Paciente',
-    paciente_telefone: m.pacientes?.telefone ?? null,
-    paciente_ddi: m.pacientes?.ddi ?? null,
-    status: '',
-    evolucao_individual: '',
-  }))
+  const alunos: PresencaAluno[] = ((matriculas ?? []) as any[])
+    .sort((a, b) => (a.pacientes?.nome ?? '').localeCompare(b.pacientes?.nome ?? '', 'pt-BR'))
+    .map((m: any) => ({
+      matricula_id: m.id,
+      paciente_id: m.paciente_id,
+      paciente_nome: m.pacientes?.nome ?? 'Paciente',
+      paciente_telefone: m.pacientes?.telefone ?? null,
+      paciente_ddi: m.pacientes?.ddi ?? null,
+      status: '',
+      evolucao_individual: '',
+    }))
 
   // Busca presenças já registradas para esta sessão
   const { data: presencasRaw } = await admin

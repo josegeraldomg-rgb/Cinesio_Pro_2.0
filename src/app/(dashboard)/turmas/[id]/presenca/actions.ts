@@ -30,7 +30,6 @@ export interface Exercicio {
   descricao: string | null
   grupo_muscular: string | null
   nivel: 'leve' | 'moderado' | 'intenso' | null
-  instrucoes: string | null
 }
 
 export interface PresencaAluno {
@@ -408,7 +407,7 @@ export async function listarExerciciosAction(): Promise<
 
   const { data, error } = await admin
     .from('biblioteca_exercicios')
-    .select('id, nome, descricao, grupo_muscular, nivel, instrucoes')
+    .select('id, nome, descricao, grupo_muscular, nivel')
     .eq('empresa_id', empresa_id)
     .order('nome')
 
@@ -422,7 +421,6 @@ export async function salvarExercicioAction(payload: {
   descricao?: string | null
   grupo_muscular?: string | null
   nivel?: 'leve' | 'moderado' | 'intenso' | null
-  instrucoes?: string | null
 }): Promise<{ success: true; id: string } | { error: string }> {
   const ctx = await getCtx()
   if ('error' in ctx) return { error: ctx.error }
@@ -436,7 +434,6 @@ export async function salvarExercicioAction(payload: {
         descricao: payload.descricao ?? null,
         grupo_muscular: payload.grupo_muscular ?? null,
         nivel: payload.nivel ?? null,
-        instrucoes: payload.instrucoes ?? null,
       })
       .eq('id', payload.id)
       .eq('empresa_id', empresa_id)
@@ -452,7 +449,6 @@ export async function salvarExercicioAction(payload: {
       descricao: payload.descricao ?? null,
       grupo_muscular: payload.grupo_muscular ?? null,
       nivel: payload.nivel ?? null,
-      instrucoes: payload.instrucoes ?? null,
     })
     .select('id')
     .single()

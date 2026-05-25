@@ -142,10 +142,9 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
         descricao: editandoEx.descricao ?? null,
         grupo_muscular: editandoEx.grupo_muscular ?? null,
         nivel: editandoEx.nivel ?? null,
-        instrucoes: editandoEx.instrucoes ?? null,
       })
       if ('error' in res) { setErro(res.error); return }
-      const novo: Exercicio = { id: res.id, nome: editandoEx.nome!, descricao: editandoEx.descricao ?? null, grupo_muscular: editandoEx.grupo_muscular ?? null, nivel: editandoEx.nivel ?? null, instrucoes: editandoEx.instrucoes ?? null }
+      const novo: Exercicio = { id: res.id, nome: editandoEx.nome!, descricao: editandoEx.descricao ?? null, grupo_muscular: editandoEx.grupo_muscular ?? null, nivel: editandoEx.nivel ?? null }
       setExercicios(prev => editandoEx.id ? prev.map(e => e.id === editandoEx.id ? novo : e) : [...prev, novo])
       setEditandoEx(null)
     })
@@ -377,7 +376,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
             <div className="space-y-3">
               <div className="flex justify-end">
                 <button
-                  onClick={() => setEditandoEx({ nome: '', descricao: null, grupo_muscular: null, nivel: null, instrucoes: null })}
+                  onClick={() => setEditandoEx({ nome: '', descricao: null, grupo_muscular: null, nivel: null })}
                   className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3829c7] transition-colors"
                 >
                   <Plus size={14} /> Novo Exercício
@@ -455,15 +454,6 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                     className="w-full border border-[#E8E8E8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A3AE8]/30 resize-none"
                     value={editandoEx.descricao ?? ''}
                     onChange={e => setEditandoEx(p => ({ ...p, descricao: e.target.value || null }))}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs text-[#7F8C8D] mb-1 block">Instruções</label>
-                  <textarea
-                    rows={3}
-                    className="w-full border border-[#E8E8E8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A3AE8]/30 resize-none"
-                    value={editandoEx.instrucoes ?? ''}
-                    onChange={e => setEditandoEx(p => ({ ...p, instrucoes: e.target.value || null }))}
                   />
                 </div>
               </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useTransition } from 'react'
-import { Plus, Search, Filter, Dumbbell, ListOrdered, FileText, Edit2, Trash2, Copy, Play, X, ChevronDown } from 'lucide-react'
+import { Plus, Search, Filter, Dumbbell, ListOrdered, FileText, Edit2, Trash2, Copy, Play, X, ChevronDown, Maximize2, Minimize2, Info } from 'lucide-react'
 import type { ExercicioBiblioteca, SequenciaBiblioteca, PlanoExercicio } from './actions'
 import {
   duplicarExercicioSistemaAction,
@@ -51,9 +51,7 @@ export function BibliotecaClient({ exerciciosIniciais, sequenciasIniciais, plano
   const [exFormModal, setExFormModal] = useState<{ ex?: ExercicioBiblioteca } | null>(null)
   const [seqModal, setSeqModal] = useState<{ seq?: SequenciaBiblioteca } | null>(null)
   const [planoModal, setPlanoModal] = useState<{ plano?: PlanoExercicio } | null>(null)
-
-  // Video player inline
-  const [videoAberto, setVideoAberto] = useState<string | null>(null)
+  const [exDetalhe, setExDetalhe] = useState<ExercicioBiblioteca | null>(null)
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; tipo: 'ok' | 'erro' } | null>(null)
@@ -303,8 +301,7 @@ export function BibliotecaClient({ exerciciosIniciais, sequenciasIniciais, plano
                   <ExercicioCard
                     key={ex.id}
                     ex={ex}
-                    videoAberto={videoAberto === ex.id}
-                    onVideoToggle={() => setVideoAberto(v => v === ex.id ? null : ex.id)}
+                    onExpandir={() => setExDetalhe(ex)}
                     onEditar={() => setExFormModal({ ex })}
                     onDuplicar={() => duplicarExercicio(ex)}
                     onExcluir={() => excluirExercicio(ex)}
@@ -381,6 +378,15 @@ export function BibliotecaClient({ exerciciosIniciais, sequenciasIniciais, plano
       )}
 
       {/* ── Modais ────────────────────────────────────────────────────────────── */}
+      {exDetalhe && (
+        <ExercicioDetalheModal
+          ex={exDetalhe}
+          onClose={() => setExDetalhe(null)}
+          onEditar={exDetalhe.is_sistema ? undefined : () => { setExDetalhe(null); setExFormModal({ ex: exDetalhe }) }}
+          onDuplicar={exDetalhe.is_sistema ? () => { setExDetalhe(null); duplicarExercicio(exDetalhe) } : undefined}
+        />
+      )}
+
       {exFormModal !== null && (
         <ExercicioFormModal
           exercicio={exFormModal.ex}
@@ -463,19 +469,29 @@ function getGrupoCor(grupo: string | null) {
   return key ? GRUPO_COR[key] : { from: '#4A3AE8', to: '#7B6FF0', text: '#4A3AE8' }
 }
 
+// ─── Helper: thumbnail YouTube ────────────────────────────────────────────────
+
+function getYoutubeThumbnail(url: string): string | null {
+  const id = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1]
+  if (!id) return null
+  return `https://img.youtube.com/vi/${id}/hqdefault.jpg`
+}
+
+function getVimeoThumbnailPlaceholder(): string {
+  return '' // Vimeo requer API async; usa placeholder
+}
+
 // ─── ExercicioCard ────────────────────────────────────────────────────────────
 
 function ExercicioCard({
   ex,
-  videoAberto,
-  onVideoToggle,
+  onExpandir,
   onEditar,
   onDuplicar,
   onExcluir,
 }: {
   ex: ExercicioBiblioteca
-  videoAberto: boolean
-  onVideoToggle: () => void
+  onExpandir: () => void
   onEditar: () => void
   onDuplicar: () => void
   onExcluir: () => void
@@ -483,27 +499,41 @@ function ExercicioCard({
   const initials = ex.nome.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
   const cor = getGrupoCor(ex.grupo_muscular)
 
+  // Imagem: imagem própria > thumbnail YouTube > placeholder
+  const thumbnail = ex.imagem_url
+    || (ex.video_url?.includes('youtu') ? getYoutubeThumbnail(ex.video_url) : null)
+
   return (
-    <div className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+    <div className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group">
 
-      {/* ── Área de mídia (thumbnail OU vídeo — nunca os dois) ── */}
-      <div className="relative flex-shrink-0" style={{ height: 160 }}>
-
-        {videoAberto && ex.video_url ? (
-          /* Vídeo substitui o thumbnail */
-          <VideoPlayer url={ex.video_url} height={160} />
-        ) : ex.imagem_url ? (
-          <img src={ex.imagem_url} alt={ex.nome} className="w-full h-full object-cover" />
+      {/* ── Área de mídia clicável ── */}
+      <div
+        className="relative flex-shrink-0 cursor-pointer"
+        style={{ height: 160 }}
+        onClick={onExpandir}
+      >
+        {thumbnail ? (
+          <>
+            <img
+              src={thumbnail}
+              alt={ex.nome}
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+            {/* Overlay escuro no hover */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                <Play size={20} className="text-[#4A3AE8] ml-0.5" fill="#4A3AE8" />
+              </div>
+            </div>
+          </>
         ) : (
           /* Placeholder com gradiente colorido */
           <div
-            className="w-full h-full flex flex-col items-center justify-center gap-1"
+            className="w-full h-full flex flex-col items-center justify-center gap-2"
             style={{ background: `linear-gradient(135deg, ${cor.from}18, ${cor.to}30)` }}
           >
-            <span
-              className="text-4xl font-black tracking-tight select-none"
-              style={{ color: `${cor.from}55` }}
-            >
+            <span className="text-4xl font-black tracking-tight select-none" style={{ color: `${cor.from}55` }}>
               {initials}
             </span>
             {ex.aparelho && (
@@ -511,6 +541,12 @@ function ExercicioCard({
                 {ex.aparelho}
               </span>
             )}
+            {/* Hover play sem vídeo */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <Info size={20} style={{ color: cor.from }} />
+              </div>
+            </div>
           </div>
         )}
 
@@ -523,52 +559,40 @@ function ExercicioCard({
           </span>
         </div>
 
-        {/* Botão play/fechar */}
+        {/* Ícone de vídeo disponível */}
         {ex.video_url && (
-          <button
-            onClick={onVideoToggle}
-            className={`absolute bottom-2.5 right-2.5 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-md transition-all ${
-              videoAberto
-                ? 'bg-white text-[#2C3E50] hover:bg-gray-100'
-                : 'bg-black/70 text-white hover:bg-black/90 backdrop-blur-sm'
-            }`}
-          >
-            {videoAberto ? <><X size={11} /> Fechar</> : <><Play size={11} fill="white" /> Assistir</>}
-          </button>
+          <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1 bg-black/60 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
+            <Play size={9} fill="white" /> Vídeo
+          </div>
         )}
       </div>
 
       {/* ── Conteúdo ── */}
       <div className="p-3.5 flex flex-col gap-2 flex-1">
-
-        {/* Nome + metadados */}
-        <div>
-          <p className="font-bold text-[#1A2332] text-sm leading-snug line-clamp-1">{ex.nome}</p>
+        <div className="cursor-pointer" onClick={onExpandir}>
+          <p className="font-bold text-[#1A2332] text-sm leading-snug line-clamp-1 group-hover:text-[#4A3AE8] transition-colors">{ex.nome}</p>
           <p className="text-[11px] text-[#7F8C8D] mt-0.5 line-clamp-1">
             {[ex.grupo_muscular, ex.regiao_corporal].filter(Boolean).join(' · ')}
           </p>
         </div>
 
-        {/* Badges nível + séries */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {nivelBadge(ex.nivel)}
           {ex.series_padrao && (
             <span className="text-[10px] font-medium text-[#7F8C8D] bg-[#F1F5F9] px-2 py-0.5 rounded-full">
-              {ex.series_padrao} séries · {ex.repeticoes_padrao ?? '—'}
+              {ex.series_padrao}x · {ex.repeticoes_padrao ?? '—'}
             </span>
           )}
         </div>
 
-        {/* Objetivo */}
         {ex.objetivo && (
           <p className="text-[11px] text-[#64748B] line-clamp-2 leading-relaxed">{ex.objetivo}</p>
         )}
 
-        {/* Ações */}
         <div className="flex items-center gap-1.5 mt-auto pt-2.5 border-t border-[#F1F5F9]">
           {ex.is_sistema ? (
             <button
-              onClick={onDuplicar}
+              onClick={(e) => { e.stopPropagation(); onDuplicar() }}
               className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors"
             >
               <Copy size={11} /> Duplicar para editar
@@ -576,19 +600,207 @@ function ExercicioCard({
           ) : (
             <>
               <button
-                onClick={onEditar}
+                onClick={(e) => { e.stopPropagation(); onEditar() }}
                 className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[#F8F9FA] text-[#2C3E50] hover:bg-[#E8ECF0] transition-colors"
               >
                 <Edit2 size={11} /> Editar
               </button>
               <button
-                onClick={onExcluir}
+                onClick={(e) => { e.stopPropagation(); onExcluir() }}
                 className="ml-auto w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
               >
                 <Trash2 size={13} />
               </button>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── ExercicioDetalheModal ────────────────────────────────────────────────────
+
+function ExercicioDetalheModal({
+  ex,
+  onClose,
+  onEditar,
+  onDuplicar,
+}: {
+  ex: ExercicioBiblioteca
+  onClose: () => void
+  onEditar?: () => void
+  onDuplicar?: () => void
+}) {
+  const [maximizado, setMaximizado] = useState(false)
+  const [videoAtivo, setVideoAtivo] = useState(false)
+  const cor = getGrupoCor(ex.grupo_muscular)
+
+  const thumbnail = ex.imagem_url
+    || (ex.video_url?.includes('youtu') ? getYoutubeThumbnail(ex.video_url) : null)
+
+  const videoH = maximizado ? 480 : 320
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className={`bg-white flex flex-col overflow-hidden transition-all duration-300 ${
+          maximizado
+            ? 'fixed inset-2 rounded-2xl'
+            : 'relative w-full max-w-2xl rounded-2xl max-h-[90vh]'
+        }`}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#F1F5F9] flex-shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+              ex.is_sistema ? 'bg-[#4A3AE8] text-white' : 'bg-emerald-500 text-white'
+            }`}>
+              {ex.is_sistema ? 'SISTEMA' : 'MINHA CLÍNICA'}
+            </span>
+            <h2 className="font-bold text-[#1A2332] text-base truncate">{ex.nome}</h2>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+            <button
+              onClick={() => setMaximizado(v => !v)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F1F5F9] transition-colors"
+              title={maximizado ? 'Restaurar' : 'Maximizar'}
+            >
+              {maximizado ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F1F5F9] transition-colors"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Área de vídeo / imagem */}
+        <div className="relative flex-shrink-0 bg-black" style={{ height: videoH }}>
+          {videoAtivo && ex.video_url ? (
+            <VideoPlayer url={ex.video_url} height={videoH} />
+          ) : thumbnail ? (
+            <div className="relative w-full h-full">
+              <img src={thumbnail} alt={ex.nome} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                {ex.video_url ? (
+                  <button
+                    onClick={() => setVideoAtivo(true)}
+                    className="flex items-center gap-3 bg-white/95 hover:bg-white text-[#1A2332] font-bold px-6 py-3 rounded-full shadow-xl text-sm transition-all hover:scale-105"
+                  >
+                    <Play size={18} fill="#4A3AE8" className="text-[#4A3AE8]" />
+                    Assistir vídeo
+                  </button>
+                ) : (
+                  <span className="text-white/60 text-sm">Sem vídeo</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Sem imagem nem thumbnail */
+            <div
+              className="w-full h-full flex flex-col items-center justify-center gap-3"
+              style={{ background: `linear-gradient(135deg, ${cor.from}25, ${cor.to}40)` }}
+            >
+              {ex.video_url ? (
+                <button
+                  onClick={() => setVideoAtivo(true)}
+                  className="flex items-center gap-3 bg-white/95 hover:bg-white font-bold px-6 py-3 rounded-full shadow-xl text-sm transition-all hover:scale-105"
+                  style={{ color: cor.from }}
+                >
+                  <Play size={18} fill={cor.from} style={{ color: cor.from }} />
+                  Assistir vídeo
+                </button>
+              ) : (
+                <span className="text-6xl font-black" style={{ color: `${cor.from}40` }}>
+                  {ex.nome.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Detalhes */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {nivelBadge(ex.nivel)}
+            {ex.aparelho && (
+              <span className="text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ background: `${cor.from}15`, color: cor.text }}>
+                {ex.aparelho}
+              </span>
+            )}
+            {ex.regiao_corporal && (
+              <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F1F5F9] text-[#64748B] font-medium">
+                {ex.regiao_corporal}
+              </span>
+            )}
+            {ex.grupo_muscular && (
+              <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F1F5F9] text-[#64748B] font-medium">
+                {ex.grupo_muscular}
+              </span>
+            )}
+          </div>
+
+          {/* Objetivo */}
+          {ex.objetivo && (
+            <div>
+              <p className="text-[11px] font-semibold text-[#7F8C8D] uppercase tracking-wider mb-1">Objetivo</p>
+              <p className="text-sm text-[#2C3E50]">{ex.objetivo}</p>
+            </div>
+          )}
+
+          {/* Prescrição padrão */}
+          {(ex.series_padrao || ex.repeticoes_padrao) && (
+            <div className="grid grid-cols-2 gap-3">
+              {ex.series_padrao && (
+                <div className="bg-[#F8F9FA] rounded-xl p-3 text-center">
+                  <p className="text-2xl font-black text-[#4A3AE8]">{ex.series_padrao}</p>
+                  <p className="text-[11px] text-[#7F8C8D] font-medium mt-0.5">Séries</p>
+                </div>
+              )}
+              {ex.repeticoes_padrao && (
+                <div className="bg-[#F8F9FA] rounded-xl p-3 text-center">
+                  <p className="text-2xl font-black text-[#4A3AE8] leading-tight">{ex.repeticoes_padrao}</p>
+                  <p className="text-[11px] text-[#7F8C8D] font-medium mt-0.5">Repetições</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Descrição / instruções */}
+          {ex.descricao && (
+            <div>
+              <p className="text-[11px] font-semibold text-[#7F8C8D] uppercase tracking-wider mb-1">Execução</p>
+              <p className="text-sm text-[#2C3E50] leading-relaxed">{ex.descricao}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Rodapé com ações */}
+        <div className="flex items-center gap-2 px-5 py-3.5 border-t border-[#F1F5F9] bg-[#FAFAFA] flex-shrink-0">
+          {onDuplicar && (
+            <button
+              onClick={onDuplicar}
+              className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors"
+            >
+              <Copy size={13} /> Duplicar para editar
+            </button>
+          )}
+          {onEditar && (
+            <button
+              onClick={onEditar}
+              className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-[#4A3AE8] text-white hover:bg-[#3829c7] transition-colors"
+            >
+              <Edit2 size={13} /> Editar exercício
+            </button>
+          )}
+          <button onClick={onClose} className="ml-auto text-sm text-[#7F8C8D] hover:text-[#2C3E50] transition-colors px-3 py-2">
+            Fechar
+          </button>
         </div>
       </div>
     </div>

@@ -103,14 +103,6 @@ export default async function AgendaPage() {
       .select('id, profissional_id, servico_id, percentual, ativo')
       .eq('empresa_id', empresaId).eq('ativo', true),
 
-    admin.from('turma_sessoes')
-      .select('id, slot_id, turma_id, data_hora, duracao_minutos, status, turmas(nome, profissional_id), turma_slots(profissional_id, salas(nome))')
-      .eq('empresa_id', empresaId)
-      .neq('status', 'cancelada')
-      .gte('data_hora', janelaInicio.toISOString())
-      .lte('data_hora', janelaFim.toISOString())
-      .order('data_hora'),
-
     admin.from('lista_espera_clinica')
       .select(`id, paciente_id, servico_id, profissional_id,
         data_inicio, data_fim, hora_inicio, hora_fim,
@@ -118,6 +110,14 @@ export default async function AgendaPage() {
         pacientes(nome, telefone, ddi), servicos(nome), profissionais(nome)`)
       .eq('empresa_id', empresaId)
       .order('created_at', { ascending: false }),
+
+    admin.from('turma_sessoes')
+      .select('id, slot_id, turma_id, data_hora, duracao_minutos, status, turmas(nome, profissional_id), turma_slots(profissional_id, salas(nome))')
+      .eq('empresa_id', empresaId)
+      .neq('status', 'cancelada')
+      .gte('data_hora', janelaInicio.toISOString())
+      .lte('data_hora', janelaFim.toISOString())
+      .order('data_hora'),
 
     getCatalogData(empresaId),
   ])

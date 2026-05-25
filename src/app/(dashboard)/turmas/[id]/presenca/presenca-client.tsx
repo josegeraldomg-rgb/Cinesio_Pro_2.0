@@ -13,6 +13,7 @@ interface Props {
   turmaNome: string
   sessoes: { id: string; data_hora: string; status: string }[]
   sessaoAtual: SessaoPresenca
+  sessaoIdInicial: string
   alunosIniciais: PresencaAluno[]
   presencasExistentes: Record<string, { status: string; evolucao_individual: string | null }>
   travada: boolean
@@ -170,7 +171,7 @@ export function PresencaClient(props: Props) {
         <div className="relative">
           <select
             className="appearance-none bg-white border border-[#E8E8E8] rounded-lg px-3 py-1.5 pr-8 text-sm text-[#2C3E50] focus:outline-none focus:ring-2 focus:ring-[#4A3AE8]/30"
-            value={props.sessaoAtual.id}
+            value={props.sessaoIdInicial}
             onChange={e => router.push(`/turmas/${props.turmaId}/presenca?sessao=${e.target.value}`)}
           >
             {props.sessoes.map(s => (

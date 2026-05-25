@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getEmpresaId } from '@/lib/get-empresa-id'
 import { PresencaClient } from './presenca-client'
@@ -25,21 +25,12 @@ export default async function PresencaPage({ params, searchParams }: Props) {
 
   if (!turma) notFound()
 
-  // Busca lista de sessões disponíveis para o seletor
+  // Busca todas as sessões da turma para o seletor (sem limit)
   const sessoesResult = await buscarSessoesDisponiveisAction(turmaId)
   if ('error' in sessoesResult) notFound()
   const { sessoes } = sessoesResult
 
-  // Sessão padrão: a do search param, ou a mais recente não-futura
-  let sessaoId = sessaoIdParam
-  if (!sessaoId || !sessoes.find(s => s.id === sessaoId)) {
-    const agora = new Date().toISOString()
-    const passadas = sessoes.filter(s => s.data_hora <= agora)
-    sessaoId = passadas[0]?.id ?? sessoes[0]?.id
-  }
-
-  if (!sessaoId) {
-    // Turma sem sessões geradas ainda
+  if (sessoes.length === 0) {
     return (
       <div className="p-8 text-center text-[#7F8C8D]">
         <p>Esta turma ainda não tem sessões geradas.</p>
@@ -48,12 +39,21 @@ export default async function PresencaPage({ params, searchParams }: Props) {
     )
   }
 
-  // Redireciona para incluir sessaoId na URL se não estava presente
-  if (!sessaoIdParam || sessaoIdParam !== sessaoId) {
-    redirect(`/turmas/${turmaId}/presenca?sessao=${sessaoId}`)
+  // Se sessaoIdParam foi fornecido e existe na lista, usa ele.
+  // Caso contrário, escolhe a sessão mais próxima do momento atual.
+  let sessaoId: string
+  if (sessaoIdParam && sessoes.find(s => s.id === sessaoIdParam)) {
+    sessaoId = sessaoIdParam
+  } else {
+    const agora = new Date().toISOString()
+    // Prefere a última sessão passada (mais recente antes de agora)
+    const passadas = sessoes.filter(s => s.data_hora <= agora)
+    sessaoId = passadas.length > 0
+      ? passadas[passadas.length - 1].id   // última passada (lista está em ASC)
+      : sessoes[0].id                       // se nenhuma passada, pega a primeira futura
   }
 
-  // Carrega dados da sessão selecionada
+  // Carrega dados da sessão (presencas, alunos, trava)
   const presencaResult = await buscarSessaoPresencaAction(sessaoId)
   if ('error' in presencaResult) notFound()
 
@@ -72,6 +72,7 @@ export default async function PresencaPage({ params, searchParams }: Props) {
       travada={presencaResult.travada}
       config={presencaResult.config}
       sequencias={sequencias}
+      sessaoIdInicial={sessaoId}
     />
   )
 }

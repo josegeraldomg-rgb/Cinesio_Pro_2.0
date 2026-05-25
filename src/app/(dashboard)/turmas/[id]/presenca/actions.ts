@@ -181,8 +181,7 @@ export async function buscarSessoesDisponiveisAction(turmaId: string): Promise<
     .eq('turma_id', turmaId)
     .eq('empresa_id', empresa_id)
     .neq('status', 'cancelada')
-    .order('data_hora', { ascending: false })
-    .limit(60)
+    .order('data_hora', { ascending: true })   // ASC para o dropdown ficar em ordem cronológica
 
   if (error) return { error: error.message }
   return { sessoes: data ?? [] }

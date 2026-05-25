@@ -1,9 +1,14 @@
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Settings, Building2, Shield, Bell, CreditCard } from 'lucide-react'
+import { Building2, Shield, Bell, Users } from 'lucide-react'
+import { PresencaConfigSection } from './presenca-config-section'
+import { buscarConfigPresencaAction } from '@/app/(dashboard)/turmas/[id]/presenca/actions'
 
-export default function ConfiguracoesPage() {
+export default async function ConfiguracoesPage() {
+  const configResult = await buscarConfigPresencaAction()
+  const config = 'config' in configResult ? configResult.config : { trava_horas: 48, validade_credito_dias: 30 }
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Dados da Empresa */}
@@ -86,6 +91,17 @@ export default function ConfiguracoesPage() {
             </div>
           ))}
         </div>
+      </Card>
+
+      {/* Presença e Chamada em Grupo */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-[#4A3AE8]" />
+            <CardTitle>Presença e Chamada em Grupo</CardTitle>
+          </div>
+        </CardHeader>
+        <PresencaConfigSection config={config} />
       </Card>
     </div>
   )

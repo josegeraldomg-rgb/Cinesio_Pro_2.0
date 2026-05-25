@@ -6,8 +6,8 @@ import type { Turma, Matricula, TurmaSessao } from './actions'
 import { atualizarStatusMatriculaAction, cancelarSessaoAction, gerarCobrancasMensaisAction, inativarTurmaAction } from './actions'
 import { TurmaFormModal } from '@/components/turmas/turma-form-modal'
 import { MatriculaModal } from '@/components/turmas/matricula-modal'
-import { ChamadaModal } from '@/components/turmas/chamada-modal'
 import { EditarTurmaModal } from '@/components/turmas/editar-turma-modal'
+import Link from 'next/link'
 import { gerarPdfTurma } from '@/lib/turma-pdf'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -203,7 +203,6 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
 function AbaSessoes({ sessoes, matriculas, onAtualizar }: { sessoes: TurmaSessao[]; matriculas: Matricula[]; onAtualizar: () => void }) {
   const [busca, setBusca]   = useState('')
   const [filtroStatus, setFiltro] = useState('todos')
-  const [chamadaInfo, setChamada] = useState<{ sessao: TurmaSessao } | null>(null)
   const [, startT] = useTransition()
 
   const filtradas = useMemo(() => {
@@ -276,11 +275,13 @@ function AbaSessoes({ sessoes, matriculas, onAtualizar }: { sessoes: TurmaSessao
                     <Icon size={11} />{cfg.label}
                   </span>
                   <div className="flex gap-2 flex-shrink-0">
-                    {s.status === 'agendada' && passado && (
-                      <button onClick={() => setChamada({ sessao: s })}
-                        className="h-8 px-3 rounded-lg bg-[#4A3AE8] text-white text-xs font-semibold hover:bg-[#3D2ED6]">
-                        Chamada
-                      </button>
+                    {(s.status === 'agendada' || s.status === 'realizada') && s.turma_id && (
+                      <Link
+                        href={`/turmas/${s.turma_id}/presenca?sessao=${s.id}`}
+                        className="h-8 px-3 rounded-lg bg-[#4A3AE8] text-white text-xs font-semibold hover:bg-[#3D2ED6] flex items-center"
+                      >
+                        {s.status === 'realizada' ? 'Ver Chamada' : 'Chamada'}
+                      </Link>
                     )}
                     {s.status === 'agendada' && (
                       <button onClick={() => cancelar(s.id)}
@@ -296,20 +297,6 @@ function AbaSessoes({ sessoes, matriculas, onAtualizar }: { sessoes: TurmaSessao
         )}
       </div>
 
-      {chamadaInfo && (() => {
-        const alunos = getAlunosDoSlot(chamadaInfo.sessao)
-        const slot = chamadaInfo.sessao.turma_slots
-        return (
-          <ChamadaModal
-            sessaoId={chamadaInfo.sessao.id}
-            dataHora={chamadaInfo.sessao.data_hora}
-            turmaNome={chamadaInfo.sessao.turmas?.nome ?? ''}
-            slotLabel={slot ? `${DIAS[slot.dia_semana ?? 0]} ${slot.hora_inicio}` : ''}
-            alunos={alunos}
-            onClose={() => setChamada(null)}
-            onConfirmado={() => { setChamada(null); onAtualizar() }} />
-        )
-      })()}
     </div>
   )
 }

@@ -1,0 +1,531 @@
+'use server'
+
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
+import { gerarLinkWaMe } from '@/lib/whatsapp'
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+export interface ExercicioSequencia {
+  exercicio_id: string
+  nome_exercicio: string
+  series: number | null
+  repeticoes: string | null   // "12-15" ou "30s" etc.
+  carga: string | null
+  obs: string | null
+}
+
+export interface Sequencia {
+  id: string
+  nome: string
+  descricao: string | null
+  exercicios: ExercicioSequencia[]
+  criado_em: string
+}
+
+export interface Exercicio {
+  id: string
+  nome: string
+  descricao: string | null
+  grupo_muscular: string | null
+  nivel: 'leve' | 'moderado' | 'intenso' | null
+  instrucoes: string | null
+}
+
+export interface PresencaAluno {
+  matricula_id: string
+  paciente_id: string
+  paciente_nome: string
+  paciente_telefone: string | null
+  paciente_ddi: string | null
+  status: 'presente' | 'faltou' | 'justificado' | ''
+  evolucao_individual: string
+}
+
+export interface SessaoPresenca {
+  id: string
+  turma_id: string
+  turma_nome: string
+  profissional_id: string | null
+  data_hora: string
+  duracao_minutos: number
+  status: string
+  sequencia_id: string | null
+  evolucao_padrao: string | null
+}
+
+export interface ConfigPresenca {
+  trava_horas: number
+  validade_credito_dias: number
+}
+
+// ─── Contexto ─────────────────────────────────────────────────────────────────
+
+type Ctx = { error: string } | { admin: ReturnType<typeof createAdminClient>; empresa_id: string }
+
+async function getCtx(): Promise<Ctx> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado.' }
+  const admin = createAdminClient()
+  const { data: me } = await admin.from('usuarios').select('empresa_id').eq('id', user.id).maybeSingle()
+  if (!me?.empresa_id) return { error: 'Empresa não encontrada.' }
+  return { admin, empresa_id: String(me.empresa_id) }
+}
+
+// ─── buscarSessaoPresencaAction ───────────────────────────────────────────────
+
+export async function buscarSessaoPresencaAction(sessaoId: string): Promise<
+  | {
+      sessao: SessaoPresenca
+      alunos: PresencaAluno[]
+      presencasExistentes: Record<string, { status: string; evolucao_individual: string | null }>
+      travada: boolean
+      config: ConfigPresenca
+    }
+  | { error: string }
+> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  // Busca configuração (DB29 / DB35)
+  const { data: empresa } = await admin
+    .from('empresas')
+    .select('configuracoes')
+    .eq('id', empresa_id)
+    .maybeSingle()
+
+  const cfg = (empresa?.configuracoes ?? {}) as Record<string, unknown>
+  const config: ConfigPresenca = {
+    trava_horas: typeof cfg.presenca_trava_horas === 'number' ? cfg.presenca_trava_horas : 48,
+    validade_credito_dias: typeof cfg.reposicao_validade_dias === 'number' ? cfg.reposicao_validade_dias : 30,
+  }
+
+  // Busca sessão
+  const { data: sessaoRaw, error: errSessao } = await admin
+    .from('turma_sessoes')
+    .select('id, turma_id, data_hora, duracao_minutos, status, sequencia_id, evolucao_padrao, turmas(nome, profissional_id)')
+    .eq('id', sessaoId)
+    .eq('empresa_id', empresa_id)
+    .maybeSingle()
+
+  if (errSessao || !sessaoRaw) return { error: errSessao?.message ?? 'Sessão não encontrada.' }
+
+  const sessao: SessaoPresenca = {
+    id: sessaoRaw.id,
+    turma_id: sessaoRaw.turma_id,
+    turma_nome: (sessaoRaw.turmas as any)?.nome ?? 'Turma',
+    profissional_id: (sessaoRaw.turmas as any)?.profissional_id ?? null,
+    data_hora: sessaoRaw.data_hora,
+    duracao_minutos: sessaoRaw.duracao_minutos,
+    status: sessaoRaw.status,
+    sequencia_id: sessaoRaw.sequencia_id ?? null,
+    evolucao_padrao: sessaoRaw.evolucao_padrao ?? null,
+  }
+
+  // Verifica trava temporal (RN8)
+  const horasDesde = (Date.now() - new Date(sessao.data_hora).getTime()) / 3_600_000
+  const travada = horasDesde > config.trava_horas
+
+  // Busca matrículas ativas da turma
+  const { data: matriculas } = await admin
+    .from('turma_matriculas')
+    .select('id, paciente_id, pacientes(nome, telefone, ddi)')
+    .eq('turma_id', sessao.turma_id)
+    .eq('empresa_id', empresa_id)
+    .eq('status', 'ativa')
+    .order('pacientes(nome)' as any)
+
+  const alunos: PresencaAluno[] = (matriculas ?? []).map((m: any) => ({
+    matricula_id: m.id,
+    paciente_id: m.paciente_id,
+    paciente_nome: m.pacientes?.nome ?? 'Paciente',
+    paciente_telefone: m.pacientes?.telefone ?? null,
+    paciente_ddi: m.pacientes?.ddi ?? null,
+    status: '',
+    evolucao_individual: '',
+  }))
+
+  // Busca presenças já registradas para esta sessão
+  const { data: presencasRaw } = await admin
+    .from('turma_presencas')
+    .select('paciente_id, status, evolucao_individual')
+    .eq('sessao_id', sessaoId)
+    .eq('empresa_id', empresa_id)
+
+  const presencasExistentes: Record<string, { status: string; evolucao_individual: string | null }> = {}
+  for (const p of presencasRaw ?? []) {
+    presencasExistentes[p.paciente_id] = {
+      status: p.status,
+      evolucao_individual: p.evolucao_individual ?? null,
+    }
+  }
+
+  return { sessao, alunos, presencasExistentes, travada, config }
+}
+
+// ─── buscarSessoesDisponiveis ─────────────────────────────────────────────────
+
+export async function buscarSessoesDisponiveisAction(turmaId: string): Promise<
+  | { sessoes: { id: string; data_hora: string; status: string }[] }
+  | { error: string }
+> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { data, error } = await admin
+    .from('turma_sessoes')
+    .select('id, data_hora, status')
+    .eq('turma_id', turmaId)
+    .eq('empresa_id', empresa_id)
+    .neq('status', 'cancelada')
+    .order('data_hora', { ascending: false })
+    .limit(60)
+
+  if (error) return { error: error.message }
+  return { sessoes: data ?? [] }
+}
+
+// ─── salvarPresencaEvolucaoAction ─────────────────────────────────────────────
+
+export async function salvarPresencaEvolucaoAction(payload: {
+  sessao_id: string
+  turma_id: string
+  profissional_id: string | null
+  evolucao_padrao: string
+  sequencia_id: string | null
+  presencas: { paciente_id: string; status: string; evolucao_individual: string }[]
+}): Promise<{ success: true } | { error: string }> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  // Verifica trava
+  const { data: sessaoCheck } = await admin
+    .from('turma_sessoes')
+    .select('data_hora')
+    .eq('id', payload.sessao_id)
+    .eq('empresa_id', empresa_id)
+    .maybeSingle()
+
+  if (!sessaoCheck) return { error: 'Sessão não encontrada.' }
+
+  const { data: empresa } = await admin
+    .from('empresas')
+    .select('configuracoes')
+    .eq('id', empresa_id)
+    .maybeSingle()
+
+  const cfg = (empresa?.configuracoes ?? {}) as Record<string, unknown>
+  const travasHoras = typeof cfg.presenca_trava_horas === 'number' ? cfg.presenca_trava_horas : 48
+  const horasDesde = (Date.now() - new Date(sessaoCheck.data_hora).getTime()) / 3_600_000
+  if (horasDesde > travasHoras) return { error: 'Sessão travada para edição.' }
+
+  // Upsert turma_presencas
+  const presencasInsert = payload.presencas
+    .filter(p => p.status !== '')
+    .map(p => ({
+      empresa_id,
+      sessao_id: payload.sessao_id,
+      turma_id: payload.turma_id,
+      paciente_id: p.paciente_id,
+      status: p.status,
+      evolucao_individual: p.evolucao_individual || null,
+    }))
+
+  if (presencasInsert.length > 0) {
+    const { error: errPresenca } = await admin
+      .from('turma_presencas')
+      .upsert(presencasInsert, { onConflict: 'sessao_id,paciente_id' })
+
+    if (errPresenca) return { error: errPresenca.message }
+  }
+
+  // Atualiza turma_sessoes (sequencia_id, evolucao_padrao, status)
+  const { error: errSessao } = await admin
+    .from('turma_sessoes')
+    .update({
+      sequencia_id: payload.sequencia_id,
+      evolucao_padrao: payload.evolucao_padrao || null,
+      status: 'realizada',
+    })
+    .eq('id', payload.sessao_id)
+    .eq('empresa_id', empresa_id)
+
+  if (errSessao) return { error: errSessao.message }
+
+  // RN9: insere evolucoes_clinicas para cada aluno presente
+  const presentes = payload.presencas.filter(p => p.status === 'presente')
+  if (presentes.length > 0 && payload.profissional_id) {
+    const evolucoes = presentes.map(p => {
+      const partes = [payload.evolucao_padrao, p.evolucao_individual].filter(Boolean)
+      return {
+        empresa_id,
+        paciente_id: p.paciente_id,
+        profissional_id: payload.profissional_id!,
+        data_atendimento: sessaoCheck.data_hora,
+        conteudo: partes.join('\n\n') || 'Presença registrada.',
+      }
+    })
+
+    // Insert sem upsert — cada chamada cria novo registro no prontuário
+    await admin.from('evolucoes_clinicas').insert(evolucoes)
+  }
+
+  revalidatePath(`/turmas`)
+  return { success: true }
+}
+
+// ─── criarCreditoReposicaoAction ──────────────────────────────────────────────
+
+export async function criarCreditoReposicaoAction(payload: {
+  paciente_id: string
+  turma_id: string
+  sessao_id: string
+  motivo: string | null
+  telefone: string | null
+  ddi: string | null
+}): Promise<{ success: true; link_whatsapp: string | null } | { error: string }> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  // Busca validade configurada
+  const { data: empresa } = await admin
+    .from('empresas')
+    .select('configuracoes, nome')
+    .eq('id', empresa_id)
+    .maybeSingle()
+
+  const cfg = (empresa?.configuracoes ?? {}) as Record<string, unknown>
+  const validadeDias = typeof cfg.reposicao_validade_dias === 'number' ? cfg.reposicao_validade_dias : 30
+
+  const dataExpiracao = new Date()
+  dataExpiracao.setDate(dataExpiracao.getDate() + validadeDias)
+
+  const { error } = await admin
+    .from('creditos_reposicao')
+    .insert({
+      empresa_id,
+      paciente_id: payload.paciente_id,
+      turma_id: payload.turma_id,
+      sessao_id: payload.sessao_id,
+      motivo: payload.motivo,
+      data_expiracao: dataExpiracao.toISOString().split('T')[0],
+      utilizado: false,
+    })
+
+  if (error) return { error: error.message }
+
+  // Gera link WhatsApp se tiver telefone
+  let link_whatsapp: string | null = null
+  if (payload.telefone && payload.ddi) {
+    const dataExp = dataExpiracao.toLocaleDateString('pt-BR')
+    const nomeClinica = empresa?.nome ?? 'Clínica'
+    const mensagem = `Olá! A *${nomeClinica}* gerou um crédito de reposição de aula para você. Válido até ${dataExp}. Entre em contato para agendar sua reposição. 😊`
+    link_whatsapp = gerarLinkWaMe({ ddi: payload.ddi, telefone: payload.telefone, mensagem })
+  }
+
+  return { success: true, link_whatsapp }
+}
+
+// ─── Sequências ───────────────────────────────────────────────────────────────
+
+export async function listarSequenciasAction(): Promise<
+  | { sequencias: Sequencia[] }
+  | { error: string }
+> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { data, error } = await admin
+    .from('sequencias_aula')
+    .select('id, nome, descricao, exercicios, criado_em')
+    .eq('empresa_id', empresa_id)
+    .order('nome')
+
+  if (error) return { error: error.message }
+  return { sequencias: (data ?? []) as Sequencia[] }
+}
+
+export async function salvarSequenciaAction(payload: {
+  id?: string
+  nome: string
+  descricao?: string | null
+  exercicios: ExercicioSequencia[]
+}): Promise<{ success: true; id: string } | { error: string }> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  if (payload.id) {
+    const { error } = await admin
+      .from('sequencias_aula')
+      .update({ nome: payload.nome, descricao: payload.descricao ?? null, exercicios: payload.exercicios })
+      .eq('id', payload.id)
+      .eq('empresa_id', empresa_id)
+    if (error) return { error: error.message }
+    return { success: true, id: payload.id }
+  }
+
+  const { data, error } = await admin
+    .from('sequencias_aula')
+    .insert({ empresa_id, nome: payload.nome, descricao: payload.descricao ?? null, exercicios: payload.exercicios })
+    .select('id')
+    .single()
+
+  if (error || !data) return { error: error?.message ?? 'Erro ao criar sequência.' }
+  return { success: true, id: data.id }
+}
+
+export async function excluirSequenciaAction(id: string): Promise<{ success: true } | { error: string }> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { error } = await admin
+    .from('sequencias_aula')
+    .delete()
+    .eq('id', id)
+    .eq('empresa_id', empresa_id)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+// ─── Exercícios ───────────────────────────────────────────────────────────────
+
+export async function listarExerciciosAction(): Promise<
+  | { exercicios: Exercicio[] }
+  | { error: string }
+> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { data, error } = await admin
+    .from('biblioteca_exercicios')
+    .select('id, nome, descricao, grupo_muscular, nivel, instrucoes')
+    .eq('empresa_id', empresa_id)
+    .order('nome')
+
+  if (error) return { error: error.message }
+  return { exercicios: (data ?? []) as Exercicio[] }
+}
+
+export async function salvarExercicioAction(payload: {
+  id?: string
+  nome: string
+  descricao?: string | null
+  grupo_muscular?: string | null
+  nivel?: 'leve' | 'moderado' | 'intenso' | null
+  instrucoes?: string | null
+}): Promise<{ success: true; id: string } | { error: string }> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  if (payload.id) {
+    const { error } = await admin
+      .from('biblioteca_exercicios')
+      .update({
+        nome: payload.nome,
+        descricao: payload.descricao ?? null,
+        grupo_muscular: payload.grupo_muscular ?? null,
+        nivel: payload.nivel ?? null,
+        instrucoes: payload.instrucoes ?? null,
+      })
+      .eq('id', payload.id)
+      .eq('empresa_id', empresa_id)
+    if (error) return { error: error.message }
+    return { success: true, id: payload.id }
+  }
+
+  const { data, error } = await admin
+    .from('biblioteca_exercicios')
+    .insert({
+      empresa_id,
+      nome: payload.nome,
+      descricao: payload.descricao ?? null,
+      grupo_muscular: payload.grupo_muscular ?? null,
+      nivel: payload.nivel ?? null,
+      instrucoes: payload.instrucoes ?? null,
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) return { error: error?.message ?? 'Erro ao criar exercício.' }
+  return { success: true, id: data.id }
+}
+
+export async function excluirExercicioAction(id: string): Promise<{ success: true } | { error: string }> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { error } = await admin
+    .from('biblioteca_exercicios')
+    .delete()
+    .eq('id', id)
+    .eq('empresa_id', empresa_id)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+// ─── Config DB29 / DB35 ───────────────────────────────────────────────────────
+
+export async function buscarConfigPresencaAction(): Promise<
+  | { config: ConfigPresenca }
+  | { error: string }
+> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { data } = await admin
+    .from('empresas')
+    .select('configuracoes')
+    .eq('id', empresa_id)
+    .maybeSingle()
+
+  const cfg = (data?.configuracoes ?? {}) as Record<string, unknown>
+  return {
+    config: {
+      trava_horas: typeof cfg.presenca_trava_horas === 'number' ? cfg.presenca_trava_horas : 48,
+      validade_credito_dias: typeof cfg.reposicao_validade_dias === 'number' ? cfg.reposicao_validade_dias : 30,
+    },
+  }
+}
+
+export async function salvarConfigPresencaAction(payload: ConfigPresenca): Promise<{ success: true } | { error: string }> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  // Merge no jsonb existente
+  const { data: atual } = await admin
+    .from('empresas')
+    .select('configuracoes')
+    .eq('id', empresa_id)
+    .maybeSingle()
+
+  const novaConfig = {
+    ...(atual?.configuracoes ?? {}),
+    presenca_trava_horas: payload.trava_horas,
+    reposicao_validade_dias: payload.validade_credito_dias,
+  }
+
+  const { error } = await admin
+    .from('empresas')
+    .update({ configuracoes: novaConfig })
+    .eq('id', empresa_id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/configuracoes')
+  return { success: true }
+}

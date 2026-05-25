@@ -5,6 +5,7 @@ import { Plus, Search, Filter, Dumbbell, ListOrdered, FileText, Edit2, Trash2, C
 import type { ExercicioBiblioteca, SequenciaBiblioteca, PlanoExercicio } from './actions'
 import {
   duplicarExercicioSistemaAction,
+  duplicarSequenciaSistemaAction,
   excluirExercicioBibliotecaAction,
   excluirSequenciaBibliotecaAction,
   excluirPlanoExercicioAction,
@@ -135,6 +136,15 @@ export function BibliotecaClient({ exerciciosIniciais, sequenciasIniciais, plano
       if ('error' in r) { showToast(r.error, 'erro'); return }
       setSequencias(prev => prev.filter(s => s.id !== seq.id))
       showToast('Sequência excluída.')
+    })
+  }
+
+  async function duplicarSequencia(seq: SequenciaBiblioteca) {
+    startT(async () => {
+      const r = await duplicarSequenciaSistemaAction(seq.id)
+      if ('error' in r) { showToast(r.error, 'erro'); return }
+      showToast(`"${seq.nome}" duplicada — edite para personalizar.`)
+      await recarregarSequencias()
     })
   }
 
@@ -332,6 +342,7 @@ export function BibliotecaClient({ exerciciosIniciais, sequenciasIniciais, plano
                   seq={seq}
                   onEditar={() => setSeqModal({ seq })}
                   onExcluir={() => excluirSequencia(seq)}
+                  onDuplicar={() => duplicarSequencia(seq)}
                 />
               ))
             )}
@@ -567,21 +578,27 @@ function VideoPlayer({ url }: { url: string }) {
 
 // ─── SequenciaRow ─────────────────────────────────────────────────────────────
 
-function SequenciaRow({ seq, onEditar, onExcluir }: {
+function SequenciaRow({ seq, onEditar, onExcluir, onDuplicar }: {
   seq: SequenciaBiblioteca
   onEditar: () => void
   onExcluir: () => void
+  onDuplicar: () => void
 }) {
   const [expandido, setExpandido] = useState(false)
 
   return (
     <div className="bg-white rounded-xl border border-[#E8E8E8] shadow-sm overflow-hidden">
       <div className="flex items-center gap-3 p-4">
-        <div className="w-9 h-9 rounded-lg bg-[#4A3AE8]/10 flex items-center justify-center flex-shrink-0">
-          <ListOrdered size={17} className="text-[#4A3AE8]" />
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${seq.is_sistema ? 'bg-[#4A3AE8]' : 'bg-[#4A3AE8]/10'}`}>
+          <ListOrdered size={17} className={seq.is_sistema ? 'text-white' : 'text-[#4A3AE8]'} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-[#2C3E50] text-sm">{seq.nome}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-[#2C3E50] text-sm truncate">{seq.nome}</p>
+            {seq.is_sistema && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#4A3AE8] text-white flex-shrink-0">SISTEMA</span>
+            )}
+          </div>
           <p className="text-xs text-[#7F8C8D]">
             {seq.exercicios.length} exercício{seq.exercicios.length !== 1 ? 's' : ''}
             {seq.descricao && ` · ${seq.descricao}`}
@@ -591,12 +608,20 @@ function SequenciaRow({ seq, onEditar, onExcluir }: {
           <button onClick={() => setExpandido(v => !v)} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F8F9FA] transition-colors">
             <ChevronDown size={15} className={`transition-transform ${expandido ? 'rotate-180' : ''}`} />
           </button>
-          <button onClick={onEditar} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F8F9FA] transition-colors">
-            <Edit2 size={14} />
-          </button>
-          <button onClick={onExcluir} className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
-            <Trash2 size={14} />
-          </button>
+          {seq.is_sistema ? (
+            <button onClick={onDuplicar} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20 transition-colors font-medium">
+              <Copy size={11} /> Duplicar
+            </button>
+          ) : (
+            <>
+              <button onClick={onEditar} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#7F8C8D] hover:bg-[#F8F9FA] transition-colors">
+                <Edit2 size={14} />
+              </button>
+              <button onClick={onExcluir} className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors">
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

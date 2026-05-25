@@ -351,10 +351,11 @@ export async function listarSequenciasAction(): Promise<
   if ('error' in ctx) return { error: ctx.error }
   const { admin, empresa_id } = ctx
 
+  // Inclui sequências do sistema (empresa_id IS NULL) + da empresa
   const { data, error } = await admin
     .from('sequencias_aula')
     .select('id, nome, descricao, exercicios, criado_em')
-    .eq('empresa_id', empresa_id)
+    .or(`empresa_id.eq.${empresa_id},is_sistema.eq.true`)
     .order('nome')
 
   if (error) return { error: error.message }

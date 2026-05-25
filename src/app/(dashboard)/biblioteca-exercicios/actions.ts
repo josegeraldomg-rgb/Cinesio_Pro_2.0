@@ -35,6 +35,8 @@ export interface ExercicioSequenciaItem {
 
 export interface SequenciaBiblioteca {
   id: string
+  empresa_id: string | null
+  is_sistema: boolean
   nome: string
   descricao: string | null
   exercicios: ExercicioSequenciaItem[]
@@ -255,14 +257,23 @@ export async function listarSequenciasBibliotecaAction(): Promise<
   if ('error' in ctx) return { error: ctx.error }
   const { admin, empresa_id } = ctx
 
+  // Busca sequências da empresa + sequências do sistema (empresa_id IS NULL)
   const { data, error } = await admin
     .from('sequencias_aula')
-    .select('id, nome, descricao, exercicios, criado_em')
-    .eq('empresa_id', empresa_id)
+    .select('id, empresa_id, is_sistema, nome, descricao, exercicios, criado_em')
+    .or(`empresa_id.eq.${empresa_id},is_sistema.eq.true`)
     .order('nome')
 
   if (error) return { error: error.message }
-  return { sequencias: (data ?? []) as SequenciaBiblioteca[] }
+
+  // Sistema primeiro, depois próprias
+  const sequencias = ((data ?? []) as SequenciaBiblioteca[]).sort((a, b) => {
+    if (a.is_sistema && !b.is_sistema) return -1
+    if (!a.is_sistema && b.is_sistema) return 1
+    return a.nome.localeCompare(b.nome, 'pt-BR')
+  })
+
+  return { sequencias }
 }
 
 export async function salvarSequenciaBibliotecaAction(payload: {
@@ -302,6 +313,11 @@ export async function excluirSequenciaBibliotecaAction(id: string): Promise<{ su
   if ('error' in ctx) return { error: ctx.error }
   const { admin, empresa_id } = ctx
 
+  // Bloqueia exclusão de sequências do sistema
+  const { data: seq } = await admin.from('sequencias_aula').select('is_sistema, empresa_id').eq('id', id).maybeSingle()
+  if (seq?.is_sistema) return { error: 'Sequências do sistema não podem ser excluídas.' }
+  if (seq?.empresa_id !== empresa_id) return { error: 'Sem permissão.' }
+
   const { error } = await admin
     .from('sequencias_aula')
     .delete()
@@ -311,6 +327,36 @@ export async function excluirSequenciaBibliotecaAction(id: string): Promise<{ su
   if (error) return { error: error.message }
   revalidatePath('/biblioteca-exercicios')
   return { success: true }
+}
+
+export async function duplicarSequenciaSistemaAction(id: string): Promise<{ success: true; id: string } | { error: string }> {
+  const ctx = await getCtx()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { data: original } = await admin
+    .from('sequencias_aula')
+    .select('nome, descricao, exercicios')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!original) return { error: 'Sequência não encontrada.' }
+
+  const { data, error } = await admin
+    .from('sequencias_aula')
+    .insert({
+      empresa_id,
+      is_sistema: false,
+      nome: `${original.nome} (cópia)`,
+      descricao: original.descricao,
+      exercicios: original.exercicios,
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) return { error: error?.message ?? 'Erro ao duplicar.' }
+  revalidatePath('/biblioteca-exercicios')
+  return { success: true, id: data.id }
 }
 
 // ─── Planos de Tratamento ─────────────────────────────────────────────────────

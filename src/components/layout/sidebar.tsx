@@ -7,16 +7,14 @@ import { createClient } from '@/lib/supabase/client'
 const navItems = [
   { href: '/dashboard',      label: 'Painel',             icon: 'dashboard' },
   { href: '/agenda',         label: 'Agenda',              icon: 'calendar_month' },
-  { href: '/horarios',       label: 'Horários',            icon: 'schedule' },
   { href: '/pacientes',      label: 'Pacientes',           icon: 'groups' },
   { href: '/turmas',         label: 'Turmas',              icon: 'sports_gymnastics' },
   { href: '/biblioteca-exercicios', label: 'Biblioteca',  icon: 'fitness_center' },
-  { href: '/servicos',       label: 'Serviços',            icon: 'medical_services' },
+  { href: '/equipe',         label: 'Equipe',              icon: 'badge' },
   { href: '/financeiro',     label: 'Financeiro',          icon: 'payments' },
   { href: '/relatorios',     label: 'Relatórios',          icon: 'description' },
   { href: '/whatsapp',       label: 'WhatsApp',            icon: 'chat' },
   { href: '/portal',         label: 'Portal do Paciente',  icon: 'favorite' },
-  { href: '/usuarios',       label: 'Usuários e Perfis',   icon: 'manage_accounts' },
   { href: '/configuracoes',  label: 'Configurações',       icon: 'settings' },
 ]
 

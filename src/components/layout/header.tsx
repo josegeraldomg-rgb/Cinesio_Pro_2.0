@@ -9,15 +9,13 @@ import Link from 'next/link'
 const PAGE_META: Record<string, { title: string; description: string }> = {
   '/dashboard':     { title: 'Painel',             description: 'Visão geral da clínica em tempo real' },
   '/agenda':        { title: 'Agenda',             description: 'Gerencie consultas, sessões e turmas' },
-  '/horarios':      { title: 'Horários',           description: 'Disponibilidade semanal, turnos e ausências dos profissionais' },
   '/pacientes':     { title: 'Pacientes',          description: 'Cadastro, evolução clínica e histórico' },
   '/turmas':        { title: 'Turmas',             description: 'Aulas em grupo, alunos e presenças' },
-  '/servicos':      { title: 'Serviços',           description: 'Catálogo, categorias, preços, durações e profissionais vinculados' },
+  '/equipe':        { title: 'Equipe',             description: 'Colaboradores, serviços e horários de trabalho' },
   '/financeiro':    { title: 'Financeiro',         description: 'Receitas, despesas, comissões e inadimplência' },
   '/relatorios':    { title: 'Relatórios',         description: 'Documentos clínicos e relatórios com IA' },
   '/whatsapp':      { title: 'WhatsApp',           description: 'Mensagens, lembretes e atendimento' },
   '/portal':        { title: 'Portal do Paciente', description: 'Experiência do paciente: progresso e agendamentos' },
-  '/usuarios':      { title: 'Usuários e Perfis',  description: 'Gerencie perfis, permissões e usuários do sistema' },
   '/configuracoes': { title: 'Configurações',      description: 'Empresa, equipe, serviços e integrações' },
 }
 

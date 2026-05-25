@@ -34,6 +34,8 @@ interface Sala { id: string; nome: string }
 interface Servico { id: string; nome: string }
 interface Paciente { id: string; nome: string; telefone: string | null }
 
+interface Sequencia { id: string; nome: string }
+
 interface Props {
   turmas: Turma[]
   matriculas: Matricula[]
@@ -42,14 +44,15 @@ interface Props {
   salas: Sala[]
   servicos: Servico[]
   pacientes: Paciente[]
+  sequencias?: Sequencia[]
 }
 
 type Tab = 'turmas' | 'sessoes' | 'matriculas'
 
 // ─── Aba Turmas ───────────────────────────────────────────────────────────────
 
-function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacientes, onAtualizar }: {
-  turmas: Turma[], matriculas: Matricula[], profissionais: Profissional[], salas: Sala[], servicos: Servico[], pacientes: Paciente[], onAtualizar: () => void
+function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacientes, sequencias, onAtualizar }: {
+  turmas: Turma[], matriculas: Matricula[], profissionais: Profissional[], salas: Sala[], servicos: Servico[], pacientes: Paciente[], sequencias?: Sequencia[], onAtualizar: () => void
 }) {
   const [modalCriar, setModalCriar] = useState(false)
   const [editarTurma, setEditarTurma] = useState<Turma | null>(null)
@@ -191,6 +194,7 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
           profissionais={profissionais}
           salas={salas}
           servicos={servicos}
+          sequencias={sequencias}
           onClose={() => setEditarTurma(null)}
           onSalvo={() => { setEditarTurma(null); showToast('Turma atualizada.'); onAtualizar() }} />
       )}
@@ -391,7 +395,7 @@ function AbaMatriculas({ matriculas, onAtualizar }: { matriculas: Matricula[]; o
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
-export function TurmasClient({ turmas, matriculas, sessoes, profissionais, salas, servicos, pacientes }: Props) {
+export function TurmasClient({ turmas, matriculas, sessoes, profissionais, salas, servicos, pacientes, sequencias = [] }: Props) {
   const [tab, setTab] = useState<Tab>('turmas')
   const [cobrancaMes, setCobrancaMes] = useState(new Date().toISOString().slice(0, 7))
   const [, startT] = useTransition()
@@ -443,7 +447,7 @@ export function TurmasClient({ turmas, matriculas, sessoes, profissionais, salas
         )}
       </div>
 
-      {tab === 'turmas'     && <AbasTurmas turmas={turmas} matriculas={matriculas} profissionais={profissionais} salas={salas} servicos={servicos} pacientes={pacientes} onAtualizar={atualizar} />}
+      {tab === 'turmas'     && <AbasTurmas turmas={turmas} matriculas={matriculas} profissionais={profissionais} salas={salas} servicos={servicos} pacientes={pacientes} sequencias={sequencias} onAtualizar={atualizar} />}
       {tab === 'sessoes'    && <AbaSessoes sessoes={sessoes} matriculas={matriculas} onAtualizar={atualizar} />}
       {tab === 'matriculas' && <AbaMatriculas matriculas={matriculas} onAtualizar={atualizar} />}
 

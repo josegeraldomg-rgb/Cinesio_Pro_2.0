@@ -102,15 +102,26 @@ export async function buscarSessaoPresencaAction(sessaoId: string): Promise<
     validade_credito_dias: typeof cfg.reposicao_validade_dias === 'number' ? cfg.reposicao_validade_dias : 30,
   }
 
-  // Busca sessão
+  // Busca sessão (incluindo slot_id para auto-preencher sequencia)
   const { data: sessaoRaw, error: errSessao } = await admin
     .from('turma_sessoes')
-    .select('id, turma_id, data_hora, duracao_minutos, status, sequencia_id, evolucao_padrao, turmas(nome, profissional_id)')
+    .select('id, turma_id, slot_id, data_hora, duracao_minutos, status, sequencia_id, evolucao_padrao, turmas(nome, profissional_id)')
     .eq('id', sessaoId)
     .eq('empresa_id', empresa_id)
     .maybeSingle()
 
   if (errSessao || !sessaoRaw) return { error: errSessao?.message ?? 'Sessão não encontrada.' }
+
+  // Auto-preenchimento: usa sequencia_padrao_id do slot quando a sessão ainda não tem sequência definida
+  let sequenciaEfetiva: string | null = (sessaoRaw as any).sequencia_id ?? null
+  if (!sequenciaEfetiva && (sessaoRaw as any).slot_id) {
+    const { data: slotRaw } = await admin
+      .from('turma_slots')
+      .select('sequencia_padrao_id')
+      .eq('id', (sessaoRaw as any).slot_id)
+      .maybeSingle()
+    sequenciaEfetiva = (slotRaw as any)?.sequencia_padrao_id ?? null
+  }
 
   const sessao: SessaoPresenca = {
     id: sessaoRaw.id,
@@ -120,7 +131,7 @@ export async function buscarSessaoPresencaAction(sessaoId: string): Promise<
     data_hora: sessaoRaw.data_hora,
     duracao_minutos: sessaoRaw.duracao_minutos,
     status: sessaoRaw.status,
-    sequencia_id: sessaoRaw.sequencia_id ?? null,
+    sequencia_id: sequenciaEfetiva,
     evolucao_padrao: sessaoRaw.evolucao_padrao ?? null,
   }
 

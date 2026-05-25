@@ -1,19 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { X, BookOpen } from 'lucide-react'
+import { X, BookOpen, ChevronDown } from 'lucide-react'
 import { editarTurmaAction } from '@/app/(dashboard)/turmas/actions'
+import { salvarSequenciaSlotAction } from '@/app/(dashboard)/biblioteca-exercicios/actions'
 import type { Turma } from '@/app/(dashboard)/turmas/actions'
 
 interface Profissional { id: string; nome: string }
 interface Sala { id: string; nome: string }
 interface Servico { id: string; nome: string }
+interface Sequencia { id: string; nome: string }
 
 interface Props {
   turma: Turma
   profissionais: Profissional[]
   salas: Sala[]
   servicos: Servico[]
+  sequencias?: Sequencia[]
   onClose: () => void
   onSalvo: () => void
 }
@@ -34,7 +37,9 @@ const NIVEL_OPTS = [
   { value: 'avancado',      label: 'Avançado',      cor: '#E74C3C' },
 ]
 
-export function EditarTurmaModal({ turma, profissionais, salas, servicos, onClose, onSalvo }: Props) {
+const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+export function EditarTurmaModal({ turma, profissionais, salas, servicos, sequencias = [], onClose, onSalvo }: Props) {
   const [nome, setNome]           = useState(turma.nome)
   const [descricao, setDescricao] = useState(turma.descricao ?? '')
   const [profId, setProfId]       = useState(turma.profissional_id ?? '')
@@ -47,6 +52,31 @@ export function EditarTurmaModal({ turma, profissionais, salas, servicos, onClos
   const [observacoes, setObs]     = useState(turma.observacoes ?? '')
   const [saving, setSaving]       = useState(false)
   const [err, setErr]             = useState('')
+
+  // Planejamento semanal por slot
+  const [slotSeqs, setSlotSeqs] = useState<Record<string, string>>(() => {
+    const m: Record<string, string> = {}
+    for (const slot of turma.slots) {
+      m[slot.id] = (slot as any).sequencia_padrao_id ?? ''
+    }
+    return m
+  })
+  const [savingSlots, setSavingSlots] = useState(false)
+  const [slotsOk, setSlotsOk] = useState(false)
+
+  async function salvarPlanejamento() {
+    setSavingSlots(true); setSlotsOk(false)
+    try {
+      for (const slot of turma.slots) {
+        await salvarSequenciaSlotAction({
+          slot_id: slot.id,
+          sequencia_padrao_id: slotSeqs[slot.id] || null,
+        })
+      }
+      setSlotsOk(true)
+      setTimeout(() => setSlotsOk(false), 2500)
+    } finally { setSavingSlots(false) }
+  }
 
   async function salvar() {
     if (!nome.trim()) { setErr('Informe o nome da turma.'); return }
@@ -182,6 +212,51 @@ export function EditarTurmaModal({ turma, profissionais, salas, servicos, onClos
               rows={2} placeholder="Notas internas sobre a turma…"
               className="input-base w-full resize-none" />
           </Section>
+
+          {sequencias.length > 0 && turma.slots.length > 0 && (
+            <>
+              <div className="border-t border-[#F0F0F0]" />
+              <Section title="Planejamento de Exercícios por Dia">
+                <p className="text-xs text-[#7F8C8D] -mt-1 mb-1">
+                  Define a sequência padrão para cada slot. Pode ser trocada na hora da aula.
+                </p>
+                <div className="space-y-2">
+                  {turma.slots.map(slot => (
+                    <div key={slot.id} className="flex items-center gap-3">
+                      <span className="text-xs font-semibold text-[#2C3E50] w-16 flex-shrink-0">
+                        {DIAS[slot.dia_semana]} {slot.hora_inicio.slice(0, 5)}
+                      </span>
+                      <div className="relative flex-1">
+                        <select
+                          value={slotSeqs[slot.id] ?? ''}
+                          onChange={e => setSlotSeqs(prev => ({ ...prev, [slot.id]: e.target.value }))}
+                          className="w-full appearance-none input-base pr-8"
+                        >
+                          <option value="">Nenhuma</option>
+                          {sequencias.map(s => (
+                            <option key={s.id} value={s.id}>{s.nome}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#7F8C8D] pointer-events-none" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={salvarPlanejamento}
+                  disabled={savingSlots}
+                  className={`mt-1 px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                    slotsOk
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-[#4A3AE8]/10 text-[#4A3AE8] hover:bg-[#4A3AE8]/20'
+                  } disabled:opacity-50`}
+                >
+                  {savingSlots ? 'Salvando…' : slotsOk ? '✓ Planejamento salvo!' : 'Salvar Planejamento'}
+                </button>
+              </Section>
+            </>
+          )}
 
           {err && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">

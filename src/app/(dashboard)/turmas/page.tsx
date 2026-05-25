@@ -34,13 +34,14 @@ export default async function TurmasPage() {
     { data: salas },
     { data: servicos },
     { data: pacientes },
+    { data: sequencias },
   ] = await Promise.all([
     admin.from('turmas')
       .select('id, nome, descricao, profissional_id, sala_id, servico_id, nivel, capacidade_slot, data_inicio, data_fim, ativo, observacoes, profissionais(nome), salas(nome)')
       .eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
 
     admin.from('turma_slots')
-      .select('id, turma_id, dia_semana, hora_inicio, hora_fim, duracao_minutos, sala_id, profissional_id, capacidade_maxima, ativo')
+      .select('id, turma_id, dia_semana, hora_inicio, hora_fim, duracao_minutos, sala_id, profissional_id, capacidade_maxima, ativo, sequencia_padrao_id')
       .eq('empresa_id', empresaId),
 
     admin.from('turma_planos')
@@ -67,6 +68,7 @@ export default async function TurmasPage() {
     admin.from('salas').select('id, nome').eq('empresa_id', empresaId),
     admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     admin.from('pacientes').select('id, nome, telefone').eq('empresa_id', empresaId).eq('status', 'ativo').order('nome'),
+    admin.from('sequencias_aula').select('id, nome').eq('empresa_id', empresaId).order('nome'),
   ])
 
   // Montar slots_ids por matrícula
@@ -98,6 +100,7 @@ export default async function TurmasPage() {
       salas={salas ?? []}
       servicos={servicos ?? []}
       pacientes={pacientes ?? []}
+      sequencias={(sequencias ?? []) as any}
     />
   )
 }

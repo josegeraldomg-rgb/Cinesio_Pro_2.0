@@ -10,6 +10,7 @@ const navItems = [
   { href: '/horarios',       label: 'Horários',            icon: 'schedule' },
   { href: '/pacientes',      label: 'Pacientes',           icon: 'groups' },
   { href: '/turmas',         label: 'Turmas',              icon: 'sports_gymnastics' },
+  { href: '/biblioteca-exercicios', label: 'Biblioteca',  icon: 'fitness_center' },
   { href: '/servicos',       label: 'Serviços',            icon: 'medical_services' },
   { href: '/financeiro',     label: 'Financeiro',          icon: 'payments' },
   { href: '/relatorios',     label: 'Relatórios',          icon: 'description' },

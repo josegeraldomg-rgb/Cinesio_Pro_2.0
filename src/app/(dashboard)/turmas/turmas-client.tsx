@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useMemo, useTransition } from 'react'
-import { Plus, Users, Calendar, BookOpen, DollarSign, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Search, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Users, Calendar, BookOpen, DollarSign, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Search, Pencil, Trash2, FileText } from 'lucide-react'
 import type { Turma, Matricula, TurmaSessao } from './actions'
 import { atualizarStatusMatriculaAction, cancelarSessaoAction, gerarCobrancasMensaisAction, inativarTurmaAction } from './actions'
 import { TurmaFormModal } from '@/components/turmas/turma-form-modal'
 import { MatriculaModal } from '@/components/turmas/matricula-modal'
 import { ChamadaModal } from '@/components/turmas/chamada-modal'
 import { EditarTurmaModal } from '@/components/turmas/editar-turma-modal'
+import { gerarPdfTurma } from '@/lib/turma-pdf'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,11 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
                   <button onClick={() => setMatriculaInfo({ turma: t })}
                     className="flex-1 h-8 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] text-xs font-semibold hover:bg-[#4A3AE8]/20">
                     Matricular Aluno
+                  </button>
+                  <button onClick={() => gerarPdfTurma(t, matriculas)}
+                    className="h-8 w-8 rounded-lg border border-[#E8E8E8] flex items-center justify-center text-[#7F8C8D] hover:text-[#27AE60] hover:border-[#27AE60]/30 transition-colors"
+                    title="Gerar PDF da turma">
+                    <FileText size={13} />
                   </button>
                   <button onClick={() => setEditarTurma(t)}
                     className="h-8 w-8 rounded-lg border border-[#E8E8E8] flex items-center justify-center text-[#7F8C8D] hover:text-[#4A3AE8] hover:border-[#4A3AE8]/30 transition-colors"

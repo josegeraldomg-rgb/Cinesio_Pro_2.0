@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useMemo, useTransition } from 'react'
-import { Plus, Users, Calendar, BookOpen, DollarSign, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Search } from 'lucide-react'
+import { Plus, Users, Calendar, BookOpen, DollarSign, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Search, Pencil, Trash2 } from 'lucide-react'
 import type { Turma, Matricula, TurmaSessao } from './actions'
-import { atualizarStatusMatriculaAction, cancelarSessaoAction, gerarCobrancasMensaisAction } from './actions'
+import { atualizarStatusMatriculaAction, cancelarSessaoAction, gerarCobrancasMensaisAction, inativarTurmaAction } from './actions'
 import { TurmaFormModal } from '@/components/turmas/turma-form-modal'
 import { MatriculaModal } from '@/components/turmas/matricula-modal'
 import { ChamadaModal } from '@/components/turmas/chamada-modal'
+import { EditarTurmaModal } from '@/components/turmas/editar-turma-modal'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,10 +51,22 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
   turmas: Turma[], matriculas: Matricula[], profissionais: Profissional[], salas: Sala[], servicos: Servico[], pacientes: Paciente[], onAtualizar: () => void
 }) {
   const [modalCriar, setModalCriar] = useState(false)
+  const [editarTurma, setEditarTurma] = useState<Turma | null>(null)
   const [matriculaInfo, setMatriculaInfo] = useState<{ turma: Turma } | null>(null)
   const [toast, setToast] = useState('')
+  const [, startT] = useTransition()
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 4000) }
+
+  function excluirTurma(turma: Turma) {
+    if (!confirm(`Excluir a turma "${turma.nome}"? Esta ação irá inativar a turma e não pode ser desfeita.`)) return
+    startT(async () => {
+      const r = await inativarTurmaAction(turma.id)
+      if ('error' in r) { alert(r.error); return }
+      showToast('Turma excluída.')
+      onAtualizar()
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -126,6 +139,16 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
                     className="flex-1 h-8 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] text-xs font-semibold hover:bg-[#4A3AE8]/20">
                     Matricular Aluno
                   </button>
+                  <button onClick={() => setEditarTurma(t)}
+                    className="h-8 w-8 rounded-lg border border-[#E8E8E8] flex items-center justify-center text-[#7F8C8D] hover:text-[#4A3AE8] hover:border-[#4A3AE8]/30 transition-colors"
+                    title="Editar turma">
+                    <Pencil size={13} />
+                  </button>
+                  <button onClick={() => excluirTurma(t)}
+                    className="h-8 w-8 rounded-lg border border-[#E8E8E8] flex items-center justify-center text-[#7F8C8D] hover:text-[#E74C3C] hover:border-[#E74C3C]/30 transition-colors"
+                    title="Excluir turma">
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               </div>
             )
@@ -154,6 +177,16 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
           pacientes={pacientes}
           onClose={() => setMatriculaInfo(null)}
           onConfirmado={() => { setMatriculaInfo(null); showToast('Aluno matriculado com sucesso!'); onAtualizar() }} />
+      )}
+
+      {editarTurma && (
+        <EditarTurmaModal
+          turma={editarTurma}
+          profissionais={profissionais}
+          salas={salas}
+          servicos={servicos}
+          onClose={() => setEditarTurma(null)}
+          onSalvo={() => { setEditarTurma(null); showToast('Turma atualizada.'); onAtualizar() }} />
       )}
     </div>
   )

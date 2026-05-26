@@ -16,6 +16,13 @@ export interface PacienteResumo {
   total_registros: number
 }
 
+export interface ProfissionalItem {
+  id:           string
+  nome:         string
+  crefito:      string | null
+  especialidade:string | null
+}
+
 export interface ProntuarioDetalhe {
   paciente: {
     id:              string
@@ -35,6 +42,13 @@ export interface ProntuarioDetalhe {
     antecedentes: string | null
     medicamentos: string | null
   }
+  empresa: {
+    nome:     string
+    telefone: string | null
+    email:    string | null
+    cnpj:     string | null
+  }
+  profissionais: ProfissionalItem[]
 }
 
 // Tipos de registro na timeline — todos persistidos em evolucoes_clinicas
@@ -163,6 +177,12 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
       pron = novo
     }
 
+    // Busca empresa e profissionais em paralelo
+    const [empRes, profRes] = await Promise.all([
+      admin.from('empresas').select('nome, telefone, email, cnpj').eq('id', empresaId).maybeSingle(),
+      admin.from('profissionais').select('id, nome, crefito, especialidade').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    ])
+
     return {
       data: {
         paciente: {
@@ -183,6 +203,18 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
           antecedentes: pron.antecedentes,
           medicamentos: pron.medicamentos,
         },
+        empresa: {
+          nome:     empRes.data?.nome     ?? 'Clínica',
+          telefone: empRes.data?.telefone ?? null,
+          email:    empRes.data?.email    ?? null,
+          cnpj:     empRes.data?.cnpj     ?? null,
+        },
+        profissionais: ((profRes.data ?? []) as { id:string; nome:string; crefito:string|null; especialidade:string|null }[]).map(p => ({
+          id:           p.id,
+          nome:         p.nome,
+          crefito:      p.crefito,
+          especialidade:p.especialidade,
+        })),
       },
     }
   } catch (e: unknown) {

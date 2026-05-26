@@ -4,7 +4,7 @@ import { ProntuarioClient } from './prontuario-client'
 import Link from 'next/link'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -12,9 +12,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProntuarioPage({ params }: Props) {
+  const { id } = await params
   const [pronRes, timelineRes] = await Promise.all([
-    buscarProntuarioAction(params.id),
-    listarTimelineAction(params.id, 'todos'),
+    buscarProntuarioAction(id),
+    listarTimelineAction(id, 'todos'),
   ])
 
   if ('error' in pronRes) {

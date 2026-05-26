@@ -5,19 +5,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-export interface AlertaCritico {
-  tipo:      'alergia' | 'cirurgia' | 'patologia'
-  descricao: string
-}
-
-export interface Medicamento {
-  nome:        string
-  dosagem:     string
-  posologia:   string
-  quantidade?: string
-  observacao?: string
-}
-
 export interface PacienteResumo {
   id:              string
   nome:            string
@@ -43,16 +30,14 @@ export interface ProntuarioDetalhe {
     status:          string
   }
   prontuario: {
-    id:               string
-    alergias:         string | null
-    antecedentes:     string | null
-    medicamentos:     string | null
-    alertas_criticos: AlertaCritico[]
-    acesso_restrito:  boolean
+    id:           string
+    alergias:     string | null
+    antecedentes: string | null
+    medicamentos: string | null
   }
 }
 
-export type TipoRegistro = 'evolucao' | 'prescricao' | 'laudo' | 'atestado' | 'anexo'
+export type TipoRegistro = 'evolucao' | 'plano'
 
 export interface RegistroTimeline {
   id:                string
@@ -79,30 +64,18 @@ export async function listarPacientesAction(): Promise<
 
     if (error) return { error: error.message }
 
-    // Conta registros de cada tipo por paciente em paralelo
     const ids = (pacientes ?? []).map((p: { id: string }) => p.id)
-
     if (ids.length === 0) return { data: [] }
 
-    const [evols, presc, laud, ates, anex] = await Promise.all([
+    const [evols, planos] = await Promise.all([
       admin.from('evolucoes_clinicas').select('paciente_id').eq('empresa_id', empresaId).in('paciente_id', ids),
-      admin.from('prescricoes').select('paciente_id').eq('empresa_id', empresaId).in('paciente_id', ids),
-      admin.from('laudos').select('paciente_id').eq('empresa_id', empresaId).in('paciente_id', ids),
-      admin.from('atestados').select('paciente_id').eq('empresa_id', empresaId).in('paciente_id', ids),
-      admin.from('prontuario_anexos').select('paciente_id').eq('empresa_id', empresaId).in('paciente_id', ids),
+      admin.from('planos_tratamento').select('paciente_id').eq('empresa_id', empresaId).in('paciente_id', ids),
     ])
 
     const countMap: Record<string, number> = {}
     for (const id of ids) countMap[id] = 0
 
-    const allRows = [
-      ...(evols.data ?? []),
-      ...(presc.data ?? []),
-      ...(laud.data ?? []),
-      ...(ates.data ?? []),
-      ...(anex.data ?? []),
-    ]
-    for (const row of allRows) {
+    for (const row of [...(evols.data ?? []), ...(planos.data ?? [])]) {
       const pid = (row as { paciente_id: string }).paciente_id
       if (pid in countMap) countMap[pid]++
     }
@@ -135,7 +108,6 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
     const { empresaId } = await getEmpresaId()
     const admin = createAdminClient()
 
-    // Busca paciente
     const { data: pac, error: pacErr } = await admin
       .from('pacientes')
       .select('id, nome, data_nascimento, cpf, telefone, email, convenio, numero_convenio, foto_url, status')
@@ -149,7 +121,7 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
     // Busca ou cria prontuário
     let { data: pron, error: pronErr } = await admin
       .from('prontuarios')
-      .select('id, alergias, antecedentes, medicamentos, alertas_criticos, acesso_restrito')
+      .select('id, alergias, antecedentes, medicamentos')
       .eq('empresa_id', empresaId)
       .eq('paciente_id', pacienteId)
       .maybeSingle()
@@ -160,7 +132,7 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
       const { data: novo, error: novoErr } = await admin
         .from('prontuarios')
         .insert({ empresa_id: empresaId, paciente_id: pacienteId })
-        .select('id, alergias, antecedentes, medicamentos, alertas_criticos, acesso_restrito')
+        .select('id, alergias, antecedentes, medicamentos')
         .single()
       if (novoErr) return { error: novoErr.message }
       pron = novo
@@ -181,12 +153,10 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
           status:          pac.status,
         },
         prontuario: {
-          id:               pron.id,
-          alergias:         pron.alergias,
-          antecedentes:     pron.antecedentes,
-          medicamentos:     pron.medicamentos,
-          alertas_criticos: (pron.alertas_criticos as AlertaCritico[]) ?? [],
-          acesso_restrito:  pron.acesso_restrito ?? false,
+          id:           pron.id,
+          alergias:     pron.alergias,
+          antecedentes: pron.antecedentes,
+          medicamentos: pron.medicamentos,
         },
       },
     }
@@ -206,36 +176,17 @@ export async function listarTimelineAction(
 
     const base = { empresa_id: empresaId, paciente_id: pacienteId }
 
-    // Busca paralela de todos os tipos
-    const [evols, prescs, laud, ates, anex] = await Promise.all([
+    const [evols, planos] = await Promise.all([
       filtro === 'todos' || filtro === 'evolucao'
         ? admin.from('evolucoes_clinicas')
-            .select('id, conteudo, data_atendimento, criado_em, profissionais(nome)')
+            .select('id, conteudo, data_atendimento, criado_em:created_at, profissionais(nome)')
             .match(base).order('data_atendimento', { ascending: false }).limit(100)
         : Promise.resolve({ data: [] }),
 
-      filtro === 'todos' || filtro === 'prescricao'
-        ? admin.from('prescricoes')
-            .select('id, tipo, medicamentos, observacoes, data_emissao, criado_em, profissionais(nome)')
-            .match(base).order('data_emissao', { ascending: false }).limit(100)
-        : Promise.resolve({ data: [] }),
-
-      filtro === 'todos' || filtro === 'laudo'
-        ? admin.from('laudos')
-            .select('id, titulo, conteudo, cid10, data_emissao, criado_em, profissionais(nome)')
-            .match(base).order('data_emissao', { ascending: false }).limit(100)
-        : Promise.resolve({ data: [] }),
-
-      filtro === 'todos' || filtro === 'atestado'
-        ? admin.from('atestados')
-            .select('id, tipo, dias, cid10, observacoes, data_emissao, criado_em, profissionais(nome)')
-            .match(base).order('data_emissao', { ascending: false }).limit(100)
-        : Promise.resolve({ data: [] }),
-
-      filtro === 'todos' || filtro === 'anexo'
-        ? admin.from('prontuario_anexos')
-            .select('id, nome, tipo_mime, url, tamanho_bytes, criado_em, profissionais(nome)')
-            .match(base).order('criado_em', { ascending: false }).limit(100)
+      filtro === 'todos' || filtro === 'plano'
+        ? admin.from('planos_tratamento')
+            .select('id, diagnostico_clinico, cid10, status, data_inicio, sessoes_previstas, sessoes_realizadas, criado_em:created_at, profissionais(nome)')
+            .match(base).order('created_at', { ascending: false }).limit(100)
         : Promise.resolve({ data: [] }),
     ])
 
@@ -246,60 +197,26 @@ export async function listarTimelineAction(
       registros.push({
         id:                row.id as string,
         tipo:              'evolucao',
-        criado_em:         (row.data_atendimento ?? row.criado_em) as string,
+        criado_em:         ((row.data_atendimento ?? row.criado_em) as string),
         profissional_nome: prof,
         resumo:            String(row.conteudo ?? '').slice(0, 120),
         dados:             row,
       })
     }
 
-    for (const row of (prescs.data ?? []) as Record<string, unknown>[]) {
+    for (const row of (planos.data ?? []) as Record<string, unknown>[]) {
       const prof = (row.profissionais as { nome?: string } | null)?.nome ?? null
-      const meds = (row.medicamentos as Medicamento[]) ?? []
-      const resumo = meds.length > 0
-        ? meds.map(m => m.nome).join(', ').slice(0, 100)
-        : `Prescrição ${row.tipo}`
+      const resumo = String(row.diagnostico_clinico ?? 'Plano de Tratamento').slice(0, 120)
       registros.push({
-        id: row.id as string, tipo: 'prescricao',
-        criado_em: (row.data_emissao ?? row.criado_em) as string,
-        profissional_nome: prof, resumo, dados: row,
-      })
-    }
-
-    for (const row of (laud.data ?? []) as Record<string, unknown>[]) {
-      const prof = (row.profissionais as { nome?: string } | null)?.nome ?? null
-      registros.push({
-        id: row.id as string, tipo: 'laudo',
-        criado_em: (row.data_emissao ?? row.criado_em) as string,
+        id:                row.id as string,
+        tipo:              'plano',
+        criado_em:         row.criado_em as string,
         profissional_nome: prof,
-        resumo: String(row.titulo ?? 'Laudo Técnico'),
-        dados: row,
+        resumo,
+        dados:             row,
       })
     }
 
-    for (const row of (ates.data ?? []) as Record<string, unknown>[]) {
-      const prof = (row.profissionais as { nome?: string } | null)?.nome ?? null
-      const tipoLabel: Record<string, string> = { afastamento: 'Afastamento', comparecimento: 'Comparecimento', acompanhamento: 'Acompanhamento' }
-      const resumo = `${tipoLabel[row.tipo as string] ?? row.tipo}${row.dias ? ` — ${row.dias} dia(s)` : ''}`
-      registros.push({
-        id: row.id as string, tipo: 'atestado',
-        criado_em: (row.data_emissao ?? row.criado_em) as string,
-        profissional_nome: prof, resumo, dados: row,
-      })
-    }
-
-    for (const row of (anex.data ?? []) as Record<string, unknown>[]) {
-      const prof = (row.profissionais as { nome?: string } | null)?.nome ?? null
-      registros.push({
-        id: row.id as string, tipo: 'anexo',
-        criado_em: row.criado_em as string,
-        profissional_nome: prof,
-        resumo: String(row.nome ?? 'Anexo'),
-        dados: row,
-      })
-    }
-
-    // Ordena por data DESC
     registros.sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())
 
     return { data: registros }
@@ -308,43 +225,23 @@ export async function listarTimelineAction(
   }
 }
 
-// ─── Alertas críticos ─────────────────────────────────────────────────────────
-export async function salvarAlertasAction(
+// ─── Atualizar campos do prontuário (alergias, antecedentes, medicamentos) ────
+export async function salvarProntuarioAction(
   prontuarioId: string,
-  alertas: AlertaCritico[],
+  payload: { alergias?: string; antecedentes?: string; medicamentos?: string },
 ): Promise<{ success: true } | { error: string }> {
   try {
     const { empresaId } = await getEmpresaId()
     const admin = createAdminClient()
     const { error } = await admin
       .from('prontuarios')
-      .update({ alertas_criticos: alertas })
+      .update(payload)
       .eq('id', prontuarioId)
       .eq('empresa_id', empresaId)
     if (error) return { error: error.message }
     return { success: true }
   } catch (e: unknown) {
-    return { error: (e as Error).message ?? 'Erro ao salvar alertas' }
-  }
-}
-
-// ─── Toggle acesso restrito ───────────────────────────────────────────────────
-export async function toggleAcessoRestritoAction(
-  prontuarioId: string,
-  restrito: boolean,
-): Promise<{ success: true } | { error: string }> {
-  try {
-    const { empresaId } = await getEmpresaId()
-    const admin = createAdminClient()
-    const { error } = await admin
-      .from('prontuarios')
-      .update({ acesso_restrito: restrito })
-      .eq('id', prontuarioId)
-      .eq('empresa_id', empresaId)
-    if (error) return { error: error.message }
-    return { success: true }
-  } catch (e: unknown) {
-    return { error: (e as Error).message ?? 'Erro ao atualizar acesso' }
+    return { error: (e as Error).message ?? 'Erro ao salvar prontuário' }
   }
 }
 
@@ -359,10 +256,10 @@ export async function salvarEvolucaoAction(
     const { data, error } = await admin
       .from('evolucoes_clinicas')
       .insert({
-        empresa_id:      empresaId,
-        paciente_id:     pacienteId,
-        profissional_id: payload.profissional_id ?? null,
-        conteudo:        payload.conteudo,
+        empresa_id:       empresaId,
+        paciente_id:      pacienteId,
+        profissional_id:  payload.profissional_id ?? null,
+        conteudo:         payload.conteudo,
         data_atendimento: new Date().toISOString(),
       })
       .select('id')
@@ -374,102 +271,39 @@ export async function salvarEvolucaoAction(
   }
 }
 
-// ─── Prescrição ───────────────────────────────────────────────────────────────
-export async function salvarPrescricaoAction(
+// ─── Plano de tratamento ──────────────────────────────────────────────────────
+export async function salvarPlanoAction(
   pacienteId: string,
   payload: {
-    tipo:            'simples' | 'especial' | 'antibiotico'
-    medicamentos:    Medicamento[]
-    observacoes?:    string | null
-    cid10?:          string | null
-    profissional_id?: string | null
+    diagnostico_clinico: string
+    cid10?:              string | null
+    sessoes_previstas?:  number | null
+    data_inicio?:        string | null
+    observacoes?:        string | null
+    profissional_id?:    string | null
   },
 ): Promise<{ success: true; id: string } | { error: string }> {
   try {
     const { empresaId } = await getEmpresaId()
     const admin = createAdminClient()
     const { data, error } = await admin
-      .from('prescricoes')
+      .from('planos_tratamento')
       .insert({
-        empresa_id:      empresaId,
-        paciente_id:     pacienteId,
-        profissional_id: payload.profissional_id ?? null,
-        tipo:            payload.tipo,
-        medicamentos:    payload.medicamentos,
-        observacoes:     payload.observacoes ?? null,
-        cid10:           payload.cid10 ?? null,
+        empresa_id:          empresaId,
+        paciente_id:         pacienteId,
+        profissional_id:     payload.profissional_id ?? null,
+        diagnostico_clinico: payload.diagnostico_clinico,
+        cid10:               payload.cid10 ?? null,
+        sessoes_previstas:   payload.sessoes_previstas ?? null,
+        data_inicio:         payload.data_inicio ?? new Date().toISOString().slice(0, 10),
+        observacoes:         payload.observacoes ?? null,
+        status:              'ativo',
       })
       .select('id')
       .single()
     if (error) return { error: error.message }
     return { success: true, id: data.id }
   } catch (e: unknown) {
-    return { error: (e as Error).message ?? 'Erro ao salvar prescrição' }
-  }
-}
-
-// ─── Laudo técnico ────────────────────────────────────────────────────────────
-export async function salvarLaudoAction(
-  pacienteId: string,
-  payload: {
-    titulo:          string
-    conteudo:        string
-    cid10?:          string | null
-    profissional_id?: string | null
-  },
-): Promise<{ success: true; id: string } | { error: string }> {
-  try {
-    const { empresaId } = await getEmpresaId()
-    const admin = createAdminClient()
-    const { data, error } = await admin
-      .from('laudos')
-      .insert({
-        empresa_id:      empresaId,
-        paciente_id:     pacienteId,
-        profissional_id: payload.profissional_id ?? null,
-        titulo:          payload.titulo,
-        conteudo:        payload.conteudo,
-        cid10:           payload.cid10 ?? null,
-      })
-      .select('id')
-      .single()
-    if (error) return { error: error.message }
-    return { success: true, id: data.id }
-  } catch (e: unknown) {
-    return { error: (e as Error).message ?? 'Erro ao salvar laudo' }
-  }
-}
-
-// ─── Atestado médico ──────────────────────────────────────────────────────────
-export async function salvarAtestadoAction(
-  pacienteId: string,
-  payload: {
-    tipo:            'afastamento' | 'comparecimento' | 'acompanhamento'
-    dias?:           number | null
-    cid10?:          string | null
-    observacoes?:    string | null
-    profissional_id?: string | null
-  },
-): Promise<{ success: true; id: string } | { error: string }> {
-  try {
-    const { empresaId } = await getEmpresaId()
-    const admin = createAdminClient()
-    const { data, error } = await admin
-      .from('atestados')
-      .insert({
-        empresa_id:      empresaId,
-        paciente_id:     pacienteId,
-        profissional_id: payload.profissional_id ?? null,
-        tipo:            payload.tipo,
-        dias:            payload.dias ?? null,
-        cid10:           payload.cid10 ?? null,
-        observacoes:     payload.observacoes ?? null,
-      })
-      .select('id')
-      .single()
-    if (error) return { error: error.message }
-    return { success: true, id: data.id }
-  } catch (e: unknown) {
-    return { error: (e as Error).message ?? 'Erro ao salvar atestado' }
+    return { error: (e as Error).message ?? 'Erro ao salvar plano' }
   }
 }

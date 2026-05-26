@@ -41,6 +41,7 @@ export interface ProntuarioDetalhe {
     alergias:     string | null
     antecedentes: string | null
     medicamentos: string | null
+    anamnese:     string | null   // usado internamente para controle de restrição de acesso
   }
   empresa: {
     nome:     string
@@ -160,7 +161,7 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
 
     let { data: pron, error: pronErr } = await admin
       .from('prontuarios')
-      .select('id, alergias, antecedentes, medicamentos')
+      .select('id, alergias, antecedentes, medicamentos, anamnese')
       .eq('empresa_id', empresaId)
       .eq('paciente_id', pacienteId)
       .maybeSingle()
@@ -171,7 +172,7 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
       const { data: novo, error: novoErr } = await admin
         .from('prontuarios')
         .insert({ empresa_id: empresaId, paciente_id: pacienteId })
-        .select('id, alergias, antecedentes, medicamentos')
+        .select('id, alergias, antecedentes, medicamentos, anamnese')
         .single()
       if (novoErr) return { error: novoErr.message }
       pron = novo
@@ -202,6 +203,7 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
           alergias:     pron.alergias,
           antecedentes: pron.antecedentes,
           medicamentos: pron.medicamentos,
+          anamnese:     pron.anamnese,
         },
         empresa: {
           nome:     empRes.data?.nome     ?? 'Clínica',
@@ -364,6 +366,51 @@ export async function salvarDocumentoAction(
     return { success: true, id: data.id }
   } catch (e: unknown) {
     return { error: (e as Error).message ?? 'Erro ao salvar documento' }
+  }
+}
+
+// ─── Restrição de acesso ──────────────────────────────────────────────────────
+// Armazena hash da senha em prontuarios.anamnese como JSON controlado
+export async function restringirAcessoAction(
+  prontuarioId: string,
+  dados: { hash: string; profissional_id: string | null },
+): Promise<{ success: true } | { error: string }> {
+  try {
+    const { empresaId } = await getEmpresaId()
+    const admin = createAdminClient()
+    const lock = JSON.stringify({
+      _locked:      true,
+      hash:         dados.hash,
+      locked_by:    dados.profissional_id,
+      locked_at:    new Date().toISOString(),
+    })
+    const { error } = await admin
+      .from('prontuarios')
+      .update({ anamnese: lock })
+      .eq('id', prontuarioId)
+      .eq('empresa_id', empresaId)
+    if (error) return { error: error.message }
+    return { success: true }
+  } catch (e: unknown) {
+    return { error: (e as Error).message ?? 'Erro ao restringir acesso' }
+  }
+}
+
+export async function removerRestricaoAction(
+  prontuarioId: string,
+): Promise<{ success: true } | { error: string }> {
+  try {
+    const { empresaId } = await getEmpresaId()
+    const admin = createAdminClient()
+    const { error } = await admin
+      .from('prontuarios')
+      .update({ anamnese: null })
+      .eq('id', prontuarioId)
+      .eq('empresa_id', empresaId)
+    if (error) return { error: error.message }
+    return { success: true }
+  } catch (e: unknown) {
+    return { error: (e as Error).message ?? 'Erro ao remover restrição' }
   }
 }
 

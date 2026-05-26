@@ -34,7 +34,6 @@ export interface ProntuarioDetalhe {
     id:              string
     nome:            string
     data_nascimento: string | null
-    sexo:            string | null
     cpf:             string | null
     telefone:        string | null
     email:           string | null
@@ -109,7 +108,7 @@ export async function listarPacientesAction(): Promise<
     }
 
     const lista: PacienteResumo[] = (pacientes ?? []).map((p: {
-      id: string; nome: string; cpf: string | null; telefone: string | null
+      id: string; nome: string; cpf: string | null; telefone: string | null;
       email: string | null; status: string; usuario_id: string | null
     }) => ({
       id:              p.id,
@@ -139,7 +138,7 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
     // Busca paciente
     const { data: pac, error: pacErr } = await admin
       .from('pacientes')
-      .select('id, nome, data_nascimento, sexo, cpf, telefone, email, convenio, numero_convenio, foto_url, status')
+      .select('id, nome, data_nascimento, cpf, telefone, email, convenio, numero_convenio, foto_url, status')
       .eq('id', pacienteId)
       .eq('empresa_id', empresaId)
       .maybeSingle()
@@ -173,7 +172,6 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
           id:              pac.id,
           nome:            pac.nome,
           data_nascimento: pac.data_nascimento,
-          sexo:            pac.sexo ?? null,
           cpf:             pac.cpf,
           telefone:        pac.telefone,
           email:           pac.email,

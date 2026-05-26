@@ -181,9 +181,6 @@ export function ProntuarioClient({
                 {paciente.data_nascimento && (
                   <span>{formatarData(paciente.data_nascimento)} · {calcularIdade(paciente.data_nascimento)}</span>
                 )}
-                {paciente.sexo && (
-                  <span>{paciente.sexo === 'M' ? 'Masculino' : paciente.sexo === 'F' ? 'Feminino' : paciente.sexo}</span>
-                )}
                 {paciente.cpf && <span>CPF {paciente.cpf}</span>}
                 {paciente.telefone && <span>{formatarTelefone(paciente.telefone)}</span>}
               </div>

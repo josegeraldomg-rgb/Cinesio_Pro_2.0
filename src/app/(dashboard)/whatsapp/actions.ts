@@ -4,8 +4,9 @@ import { getEmpresaId } from '@/lib/get-empresa-id'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 // ─── Env vars ────────────────────────────────────────────────────────────────
-const UAZAPI_URL          = process.env.UAZAPI_URL         ?? ''
-const UAZAPI_ADMIN_TOKEN  = process.env.UAZAPI_ADMIN_TOKEN ?? ''
+const UAZAPI_URL          = process.env.UAZAPI_URL          ?? ''
+const UAZAPI_ADMIN_TOKEN  = process.env.UAZAPI_ADMIN_TOKEN  ?? ''
+const APP_URL             = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
 export interface WaConfig {
@@ -15,14 +16,21 @@ export interface WaConfig {
   phone?:         string
 }
 
+export interface WaReqDebug {
+  method:   string
+  url:      string
+  headers:  Record<string, string>
+  body?:    object
+}
+
 export type WaStatusResult =
-  | { status: 'no_instance' }
-  | { status: 'not_configured' }
-  | { status: 'connected';    instanceId: string; phone: string; jid: string }
-  | { status: 'disconnected'; instanceId: string }
-  | { status: 'qrcode';       instanceId: string; qrcode: string }
-  | { status: 'paircode';     instanceId: string; paircode: string }
-  | { error: string }
+  | { status: 'no_instance';   _req?: WaReqDebug }
+  | { status: 'not_configured';_req?: WaReqDebug }
+  | { status: 'connected';    instanceId: string; phone: string; jid: string; _req?: WaReqDebug }
+  | { status: 'disconnected'; instanceId: string;                              _req?: WaReqDebug }
+  | { status: 'qrcode';       instanceId: string; qrcode: string;             _req?: WaReqDebug }
+  | { status: 'paircode';     instanceId: string; paircode: string;           _req?: WaReqDebug }
+  | { error: string;          _req?: WaReqDebug }
 
 // ─── Helpers UAZAPI ───────────────────────────────────────────────────────────
 function isConfigured() {
@@ -55,33 +63,45 @@ async function uazapiInstance(
   endpoint: string,
   method:   'GET' | 'POST' | 'DELETE',
   body?:    object,
-): Promise<any> {
-  const res = await fetch(`${UAZAPI_URL}${endpoint}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'token':        token,   // UAZAPI padrão
-      'apikey':       token,   // Evolution API v2 / UAZAPI alternativo
-    },
-    body:  body ? JSON.stringify(body) : undefined,
-    cache: 'no-store',
-  })
+): Promise<{ data: any; req: WaReqDebug }> {
+  const url     = `${UAZAPI_URL}${endpoint}`
+  const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'token': token }
+  const req: WaReqDebug = { method, url, headers, body }
+
+  const res  = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' })
   const text = await res.text()
-  try   { return JSON.parse(text) }
-  catch { return { _raw: text } }
+  let data: any
+  try   { data = JSON.parse(text) }
+  catch { data = { _raw: text } }
+  return { data, req }
 }
 
-/** Normaliza o campo 'connected' de diferentes versões da UAZAPI / Evolution */
+/** Normaliza o campo 'connected' de diferentes versões da UAZAPI / Evolution.
+ *  NÃO faz short-circuit em connected===false — verifica todos os indicadores. */
 function parseConnected(raw: any): boolean {
-  if (raw.connected === true)  return true
-  if (raw.connected === false) return false
-  const state: string = raw.state ?? raw.status ?? raw.connection?.state ?? ''
-  return ['open', 'authenticated', 'logged_in', 'connected'].includes(state.toLowerCase())
+  // Indicadores positivos — qualquer um é suficiente
+  if (raw.connected         === true) return true
+  if (raw.loggedIn          === true) return true
+  if (raw.instance?.loggedIn=== true) return true
+  if (raw.status?.connected === true) return true
+  if (raw.status?.loggedIn  === true) return true
+
+  // Verifica campos de string (instance.status, raw.state, etc.)
+  const instanceStatus = typeof raw.instance?.status === 'string' ? raw.instance.status : ''
+  const state: string  =
+    raw.state ??
+    raw.connection?.state ??
+    instanceStatus ??
+    (typeof raw.status === 'string' ? raw.status : '') ??
+    ''
+  if (['open', 'authenticated', 'logged_in', 'connected'].includes(state.toLowerCase())) return true
+
+  return false
 }
 
-/** Remove sufixo @s.whatsapp.net e formata como telefone */
+/** Remove sufixo @s.whatsapp.net e identificador de dispositivo (:84) e formata como telefone */
 function jidToPhone(jid: string): string {
-  const num = jid.split('@')[0]
+  const num = jid.split('@')[0].split(':')[0]
   if (num.startsWith('55') && num.length >= 12) {
     const ddd = num.slice(2, 4)
     const tel = num.slice(4)
@@ -135,22 +155,26 @@ export async function getStatusWaAction(): Promise<WaStatusResult> {
     const cfg = await getConfig(empresaId)
     if (!cfg) return { status: 'no_instance' }
 
-    const raw = await uazapiInstance(cfg.instance_token, '/instance/status', 'GET')
+    const { data: raw, req } = await uazapiInstance(cfg.instance_token, '/instance/status', 'GET')
     const connected = parseConnected(raw)
 
     if (connected) {
-      const rawJid = raw.jid ?? raw.user?.id ?? cfg.jid ?? ''
-      const jid    = rawJid.split('@')[0]
+      const rawJid = raw.jid ?? raw.status?.jid ?? raw.instance?.jid ?? raw.user?.id ?? cfg.jid ?? ''
+      const jid    = rawJid.split('@')[0].split(':')[0]
       const phone  = jidToPhone(rawJid || jid)
-
-      // Persiste JID / phone se ainda não estava salvo
-      if (!cfg.jid || !cfg.phone) {
+      if (!cfg.jid || cfg.jid !== jid || !cfg.phone) {
         await saveConfig(empresaId, { ...cfg, jid, phone })
       }
-      return { status: 'connected', instanceId: cfg.instance_id, phone, jid }
+      return { status: 'connected', instanceId: cfg.instance_id, phone, jid, _req: req }
     }
 
-    return { status: 'disconnected', instanceId: cfg.instance_id }
+    // Instância em processo de conexão — retorna QR Code atualizado se disponível
+    const freshQr = raw.qrcode ?? raw.instance?.qrcode ?? ''
+    if (freshQr) {
+      return { status: 'qrcode', instanceId: cfg.instance_id, qrcode: freshQr, _req: req }
+    }
+
+    return { status: 'disconnected', instanceId: cfg.instance_id, _req: req }
   } catch (e: any) {
     return { error: e.message ?? 'Erro desconhecido' }
   }
@@ -161,32 +185,35 @@ export async function getStatusWaAction(): Promise<WaStatusResult> {
  * Endpoint real: POST /instance/create  (sem header de autenticação)
  */
 export async function criarInstanciaWaAction(): Promise<
-  { instanceId: string; instanceToken: string } | { error: string }
+  { instanceId: string; instanceToken: string; _req: WaReqDebug } | { error: string; _req: WaReqDebug }
 > {
+  const url     = `${UAZAPI_URL}/instance/create`
+  const headers = { 'Content-Type': 'application/json', 'admintoken': UAZAPI_ADMIN_TOKEN, 'apikey': UAZAPI_ADMIN_TOKEN }
+
   try {
     const { empresaId } = await getEmpresaId()
+    const instanceName  = `empresa-${empresaId.slice(0, 8)}-${Date.now()}`
+    const body          = { name: instanceName }
+    const req: WaReqDebug = { method: 'POST', url, headers, body }
 
-    // Endpoint correto conforme documentação UAZAPI — sem auth header
-    const res = await fetch(`${UAZAPI_URL}/instance/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body:  JSON.stringify({ name: empresaId }),
-      cache: 'no-store',
-    })
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), cache: 'no-store' })
     const raw = await res.json().catch(() => ({}))
 
-    // Normaliza diferentes formatos de resposta
+    if (!res.ok) {
+      return { error: `UAZAPI HTTP ${res.status}: ${JSON.stringify(raw)}`, _req: req }
+    }
+
     const instanceId    = raw.id    ?? raw.data?.id    ?? raw.instance?.id    ?? ''
     const instanceToken = raw.token ?? raw.data?.token ?? raw.instance?.token ?? ''
 
     if (!instanceId || !instanceToken) {
-      return { error: `Resposta inesperada da UAZAPI: ${JSON.stringify(raw)}` }
+      return { error: `Resposta inesperada da UAZAPI: ${JSON.stringify(raw)}`, _req: req }
     }
 
     await saveConfig(empresaId, { instance_id: instanceId, instance_token: instanceToken })
-    return { instanceId, instanceToken }
+    return { instanceId, instanceToken, _req: req }
   } catch (e: any) {
-    return { error: e.message ?? 'Erro ao criar instância' }
+    return { error: e.message ?? 'Erro ao criar instância', _req: { method: 'POST', url, headers } }
   }
 }
 
@@ -195,7 +222,10 @@ export async function criarInstanciaWaAction(): Promise<
  * Endpoint: POST /instance/connect  •  header: token  •  body: { phone? }
  */
 export async function conectarWaAction(phone?: string): Promise<
-  { qrcode: string } | { paircode: string } | { error: string }
+  | { qrcode: string;          _req: WaReqDebug }
+  | { paircode: string;        _req: WaReqDebug }
+  | { already_connected: true; _req: WaReqDebug }
+  | { error: string;           _req?: WaReqDebug }
 > {
   try {
     if (!isConfigured()) return { error: 'UAZAPI não configurado.' }
@@ -204,16 +234,19 @@ export async function conectarWaAction(phone?: string): Promise<
     const cfg = await getConfig(empresaId)
     if (!cfg) return { error: 'Nenhuma instância encontrada. Crie uma primeiro.' }
 
-    // Com phone → paircode; sem phone → QR Code
-    const body = phone ? { phone } : {}
-    const raw  = await uazapiInstance(cfg.instance_token, '/instance/connect', 'POST', body)
+    const body = phone ? { phone, browser: 'auto' } : { browser: 'auto' }
+    const { data: raw, req } = await uazapiInstance(cfg.instance_token, '/instance/connect', 'POST', body)
 
-    if (raw.qrcode)        return { qrcode: raw.qrcode }
-    if (raw.paircode)      return { paircode: raw.paircode }
-    if (raw.data?.qrcode)  return { qrcode: raw.data.qrcode }
-    if (raw.data?.paircode)return { paircode: raw.data.paircode }
+    const isConnected = raw.connected === true || raw.instance?.loggedIn === true
+    if (isConnected) return { already_connected: true, _req: req }
 
-    return { error: `Resposta inesperada: ${JSON.stringify(raw)}` }
+    const qrcode   = raw.qrcode   ?? raw.data?.qrcode   ?? raw.instance?.qrcode   ?? ''
+    const paircode = raw.paircode ?? raw.data?.paircode ?? raw.instance?.paircode ?? ''
+
+    if (qrcode)   return { qrcode, _req: req }
+    if (paircode) return { paircode, _req: req }
+
+    return { error: `Resposta inesperada: ${JSON.stringify(raw)}`, _req: req }
   } catch (e: any) {
     return { error: e.message ?? 'Erro ao conectar' }
   }
@@ -269,10 +302,13 @@ export async function excluirInstanciaWaAction(): Promise<{ success: true } | { 
 }
 
 /**
- * Reconfigura o webhook na UAZAPI apontando para o receptor do CinesioPro.
- * Garante que mensagens recebidas, confirmações e status cheguem ao sistema.
+ * Configura (ou atualiza) o webhook da instância UAZAPI — Modo Simples.
+ * Sem action/id: cria um novo ou atualiza o único webhook existente automaticamente.
+ * Requer URL pública acessível pela UAZAPI.
  */
-export async function configurarWebhookWaAction(): Promise<{ success: true } | { error: string }> {
+export async function configurarWebhookWaAction(customUrl?: string): Promise<
+  { success: true; url: string } | { error: string }
+> {
   try {
     if (!isConfigured()) return { error: 'UAZAPI não configurado.' }
 
@@ -280,13 +316,93 @@ export async function configurarWebhookWaAction(): Promise<{ success: true } | {
     const cfg = await getConfig(empresaId)
     if (!cfg) return { error: 'Nenhuma instância encontrada.' }
 
-    // A UAZAPI não exige URL de webhook externo — apenas sincroniza a configuração
+    // URL: 1) passada pelo usuário via UI, 2) variável de ambiente APP_URL
+    const baseUrl = customUrl?.trim() || APP_URL || ''
+    if (!baseUrl) {
+      return {
+        error: 'Informe a URL pública do sistema no campo abaixo (ex: https://seudominio.com).',
+      }
+    }
+
+    const webhookUrl = `${baseUrl.replace(/\/$/, '')}/api/webhook/uazapi?token=${cfg.instance_token}`
+
+    // Modo simples (sem action / id) — UAZAPI cria ou atualiza automaticamente
     await uazapiInstance(cfg.instance_token, '/webhook', 'POST', {
-      events: ['messages', 'connection', 'messages_update', 'message.ack'],
+      url:                 webhookUrl,
+      enabled:             true,
+      events:              ['messages', 'messages_update', 'connection'],
+      excludeMessages:     ['wasSentByApi'],  // ⚠️ evita loop: mensagens enviadas por API não voltam como evento
+      addUrlEvents:        false,
+      addUrlTypesMessages: false,
     })
 
-    return { success: true }
+    return { success: true, url: webhookUrl }
   } catch (e: any) {
     return { error: e.message ?? 'Erro ao configurar webhook' }
   }
+}
+
+/**
+ * Retorna a configuração atual do webhook da instância.
+ */
+export async function verWebhookWaAction(): Promise<
+  { data: any[] } | { error: string }
+> {
+  try {
+    if (!isConfigured()) return { error: 'UAZAPI não configurado.' }
+    const { empresaId } = await getEmpresaId()
+    const cfg = await getConfig(empresaId)
+    if (!cfg) return { error: 'Nenhuma instância encontrada.' }
+    const { data } = await uazapiInstance(cfg.instance_token, '/webhook', 'GET')
+    return { data: Array.isArray(data) ? data : (data ? [data] : []) }
+  } catch (e: any) {
+    return { error: e.message ?? 'Erro ao buscar webhook' }
+  }
+}
+
+/**
+ * Retorna os últimos 20 erros de entrega do webhook local da instância.
+ * Útil para diagnosticar por que mensagens não estão chegando.
+ */
+export async function verWebhookErrosWaAction(): Promise<
+  { data: WebhookErro[]; capturaDesde: string | null } | { error: string }
+> {
+  try {
+    if (!isConfigured()) return { error: 'UAZAPI não configurado.' }
+    const { empresaId } = await getEmpresaId()
+    const cfg = await getConfig(empresaId)
+    if (!cfg) return { error: 'Nenhuma instância encontrada.' }
+
+    const url     = `${UAZAPI_URL}/webhook/errors`
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'token': cfg.instance_token }
+    const res     = await fetch(url, { method: 'GET', headers, cache: 'no-store' })
+    const capturaDesde = res.headers.get('X-Webhook-Error-Capture-Started-At')
+    const text    = await res.text()
+    let raw: any
+    try { raw = JSON.parse(text) } catch { raw = [] }
+
+    const lista: WebhookErro[] = (Array.isArray(raw) ? raw : []).map((e: any) => ({
+      created:     e.created ?? e.timestamp ?? '',
+      url:         e.url ?? '',
+      evento:      e.event ?? e.evento ?? '',
+      tentativas:  e.attempts ?? e.tentativas ?? 0,
+      httpStatus:  e.status ?? e.httpStatus ?? null,
+      erro:        e.error ?? e.message ?? e.erro ?? '',
+      payload:     e.payload ?? null,
+    }))
+
+    return { data: lista, capturaDesde }
+  } catch (e: any) {
+    return { error: e.message ?? 'Erro ao buscar erros do webhook' }
+  }
+}
+
+export interface WebhookErro {
+  created:    string
+  url:        string
+  evento:     string
+  tentativas: number
+  httpStatus: number | null
+  erro:       string
+  payload:    any
 }

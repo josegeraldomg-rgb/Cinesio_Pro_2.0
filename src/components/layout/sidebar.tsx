@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard',      label: 'Painel',             icon: 'dashboard' },
   { href: '/agenda',         label: 'Agenda',              icon: 'calendar_month' },
   { href: '/pacientes',      label: 'Pacientes',           icon: 'groups' },
+  { href: '/prontuarios',    label: 'Prontuários',         icon: 'clinical_notes' },
   { href: '/turmas',         label: 'Turmas',              icon: 'sports_gymnastics' },
   { href: '/biblioteca-exercicios', label: 'Biblioteca',  icon: 'fitness_center' },
   { href: '/equipe',         label: 'Equipe',              icon: 'badge' },

@@ -8,13 +8,17 @@ import {
   desconectarWaAction,
   excluirInstanciaWaAction,
   configurarWebhookWaAction,
+  verWebhookWaAction,
+  verWebhookErrosWaAction,
 } from './actions'
+import type { WebhookErro } from './actions'
 import type { WaStatusResult } from './actions'
+import type { AddLogFn } from './whatsapp-client'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-const LOADING_TIMEOUT   = 14   // segundos de espera ao criar / conectar
-const POLLING_INTERVAL  = 3000 // ms — verifica status enquanto aguarda QR scan
-const QR_POLL_LIMIT     = 20   // ~60 s de polling antes de expirar
+const LOADING_TIMEOUT        = 14    // segundos de espera ao criar / conectar
+const POLLING_INTERVAL       = 3000  // ms — verifica status a cada 3s enquanto aguarda QR scan
+const QR_POLL_LIMIT          = 60    // ~180 s de polling (60 × 3s = 3 min) antes de expirar
 
 // ─── Ícones SVG inline ────────────────────────────────────────────────────────
 function IconCheck() {
@@ -118,23 +122,42 @@ type Status =
 // ═════════════════════════════════════════════════════════════════════════════
 // Componente principal
 // ═════════════════════════════════════════════════════════════════════════════
-export function ConexaoTab() {
+export function ConexaoTab({
+  addLog        = () => {},
+  debugEnabled  = false,
+}: {
+  addLog?:       AddLogFn
+  debugEnabled?: boolean
+}) {
   const [status,        setStatus]        = useState<Status>('init')
   const [instanceId,    setInstanceId]    = useState<string | null>(null)
   const [qrcode,        setQrcode]        = useState<string | null>(null)
   const [paircode,      setPaircode]      = useState<string | null>(null)
-  const [phone,         setPhone]         = useState<string | null>(null)  // phone do WA conectado
-  const [phoneInput,    setPhoneInput]    = useState('')                   // input do usuário para paircode
-  const [usePaircode,   setUsePaircode]   = useState(false)                // toggle QR vs paircode
+  const [phone,         setPhone]         = useState<string | null>(null)
+  const [phoneInput,    setPhoneInput]    = useState('')
+  const [usePaircode,   setUsePaircode]   = useState(false)
   const [errorMsg,      setErrorMsg]      = useState<string | null>(null)
-  const [countdown,  setCountdown]  = useState(LOADING_TIMEOUT)
-  const [refreshing, setRefreshing] = useState(false)
-  const [toast,      setToast]      = useState<{ msg: string; ok: boolean } | null>(null)
-  const [confirming, setConfirming] = useState(false)
+  const [countdown,     setCountdown]     = useState(LOADING_TIMEOUT)
+  const [refreshing,    setRefreshing]    = useState(false)
+  const [toast,         setToast]         = useState<{ msg: string; ok: boolean } | null>(null)
+  const [webhookUrl,    setWebhookUrl]    = useState<string | null>(null)
+  const [webhookAtual,  setWebhookAtual]  = useState<string | null>(null)
+  const [urlManual,     setUrlManual]     = useState('')
+  const [webhookErros,  setWebhookErros]  = useState<WebhookErro[] | null>(null)
+  const [capturaDesde,  setCapturaDesde]  = useState<string | null>(null)
+  const [loadingErros,  setLoadingErros]  = useState(false)
 
-  const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollCount    = useRef(0)
+  const pollActive   = useRef(false)
+  const statusRef    = useRef<Status>('init')   // espelho do status para leitura em callbacks
   const cdRef        = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── setStatus com ref espelho ────────────────────────────────────────────────
+  function safeSetStatus(s: Status) {
+    statusRef.current = s
+    setStatus(s)
+  }
 
   // ── Toast helper ────────────────────────────────────────────────────────────
   function showToast(msg: string, ok = true) {
@@ -145,60 +168,110 @@ export function ConexaoTab() {
   // ── Aplica resultado de getStatus ────────────────────────────────────────
   const applyStatus = useCallback((res: WaStatusResult) => {
     if ('error' in res) {
-      setStatus('error')
-      setErrorMsg(res.error)
+      // Não apaga QR em erro transitório — só mostra erro se não estiver em scan
+      if (statusRef.current !== 'qrcode' && statusRef.current !== 'paircode') {
+        safeSetStatus('error')
+        setErrorMsg(res.error)
+      }
       return
     }
     switch (res.status) {
       case 'no_instance':
-        setStatus('no_instance'); setInstanceId(null); break
+        safeSetStatus('no_instance'); setInstanceId(null); break
       case 'not_configured':
-        setStatus('not_configured'); break
+        safeSetStatus('not_configured'); break
       case 'connected':
-        setStatus('connected')
+        safeSetStatus('connected')
         setInstanceId(res.instanceId)
         setPhone(res.phone)
         stopPolling()
         break
       case 'disconnected':
-        setStatus('disconnected')
+        // Se estamos aguardando QR scan, NÃO muda a tela nem para o polling
+        if (statusRef.current === 'qrcode' || statusRef.current === 'paircode') break
+        safeSetStatus('disconnected')
         setInstanceId(res.instanceId)
         stopPolling()
         break
       case 'qrcode':
-        setStatus('qrcode')
+        safeSetStatus('qrcode')
         setInstanceId(res.instanceId)
         setQrcode(res.qrcode)
         break
       case 'paircode':
-        setStatus('paircode')
+        safeSetStatus('paircode')
         setInstanceId(res.instanceId)
         setPaircode(res.paircode)
         break
     }
   }, [])
 
-  // ── Polling ─────────────────────────────────────────────────────────────────
+  // ── Polling (aguarda QR scan — para assim que conectar) ─────────────────────
+  // ── Polling via setTimeout recursivo (sem sobreposição de chamadas) ─────────
   function stopPolling() {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    pollActive.current = false
+    if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
   }
+
   function startPolling() {
-    stopPolling()
-    pollCount.current = 0
-    pollRef.current = setInterval(async () => {
+    stopPolling()           // mata qualquer polling anterior
+    pollCount.current = 0   // zera contador
+    pollActive.current = true
+
+    async function tick() {
+      if (!pollActive.current) return  // foi cancelado enquanto aguardava
+
       pollCount.current++
-      if (pollCount.current >= QR_POLL_LIMIT) {
-        stopPolling()
-        setStatus('disconnected')
-        showToast('QR Code expirou. Gere um novo.', false)
+
+      if (pollCount.current > QR_POLL_LIMIT) {
+        pollActive.current = false
+        showToast('QR Code expirou. Excluindo instância…', false)
+        await excluirInstanciaWaAction()
+        safeSetStatus('no_instance')
+        setInstanceId(null)
+        setQrcode(null)
         return
       }
+
       const res = await getStatusWaAction()
-      if (!('error' in res) && res.status === 'connected') {
-        applyStatus(res)
-        showToast('WhatsApp conectado com sucesso! ✓')
+      if (!pollActive.current) return  // cancelado enquanto aguardava resposta
+
+      logReqRes(`getStatus [poll #${pollCount.current}]`, res)
+
+      if (!('error' in res)) {
+        // 1. Novo QR → atualiza imagem, polling continua
+        if ('qrcode' in res && res.qrcode) {
+          setQrcode(res.qrcode)
+          safeSetStatus('qrcode')
+        }
+
+        // 2. Conectado → para tudo
+        if (res.status === 'connected') {
+          pollActive.current = false
+          applyStatus(res)
+          showToast('WhatsApp conectado com sucesso! ✓')
+          return
+        }
+
+        // 3. Instância sumiu → para e volta ao início
+        if (res.status === 'no_instance') {
+          pollActive.current = false
+          safeSetStatus('no_instance')
+          setInstanceId(null)
+          showToast('Instância não encontrada no servidor.', false)
+          return
+        }
+
+        // 4. disconnected → QR atual fica na tela, próxima tentativa agendada abaixo
       }
-    }, POLLING_INTERVAL)
+
+      // Só agenda próxima chamada após esta terminar completamente
+      if (pollActive.current) {
+        pollRef.current = setTimeout(tick, POLLING_INTERVAL)
+      }
+    }
+
+    pollRef.current = setTimeout(tick, POLLING_INTERVAL)
   }
 
   // ── Countdown durante loading ────────────────────────────────────────────
@@ -219,9 +292,29 @@ export function ConexaoTab() {
     if (cdRef.current) { clearInterval(cdRef.current); cdRef.current = null }
   }
 
+  // ── Mascara valores sensíveis (tokens) nos logs ──────────────────────────
+  function maskSensitive(obj: object): object {
+    const sensitive = new Set(['token', 'admintoken', 'apikey', 'authorization', 'admin-token'])
+    return JSON.parse(JSON.stringify(obj, (key, value) => {
+      if (sensitive.has(key.toLowerCase()) && typeof value === 'string' && value.length > 8)
+        return `${value.slice(0, 4)}****${value.slice(-4)}`
+      return value
+    }))
+  }
+
+  // ── Log helper com _req ──────────────────────────────────────────────────
+  function logReqRes(acao: string, res: any) {
+    const { _req, ...body } = res
+    if (_req) addLog('Enviado',   acao, maskSensitive(_req))
+    addLog('Recebido', acao, body)
+  }
+
   // ── Carregamento inicial ─────────────────────────────────────────────────
   useEffect(() => {
-    getStatusWaAction().then(applyStatus)
+    getStatusWaAction().then(res => {
+      logReqRes('getStatus [init]', res)
+      applyStatus(res)
+    })
     return () => { stopPolling(); stopCountdown() }
   }, [applyStatus])
 
@@ -229,20 +322,36 @@ export function ConexaoTab() {
   async function handleRefresh() {
     setRefreshing(true)
     const res = await getStatusWaAction()
+    logReqRes('getStatus [refresh]', res)
+
+    // Durante QR scan não interfere: apenas atualiza imagem se vier novo QR
+    if (statusRef.current === 'qrcode' || statusRef.current === 'paircode') {
+      if (!('error' in res) && 'qrcode' in res && res.qrcode) {
+        setQrcode(res.qrcode)
+      }
+      setRefreshing(false)
+      return
+    }
+
     applyStatus(res)
     setRefreshing(false)
   }
 
   // ── Criar instância e conectar ───────────────────────────────────────────
   async function handleCriarEConectar() {
-    setStatus('loading')
+    stopPolling()      // garante que polling anterior está morto
+    setQrcode(null)    // limpa QR anterior
+    setPaircode(null)
+    safeSetStatus('loading')
     startCountdown()
     setErrorMsg(null)
 
     const criarRes = await criarInstanciaWaAction()
+    logReqRes('criarInstancia', criarRes)
+
     if ('error' in criarRes) {
       stopCountdown()
-      setStatus('error')
+      safeSetStatus('error')
       setErrorMsg(criarRes.error)
       return
     }
@@ -251,69 +360,97 @@ export function ConexaoTab() {
     // Configura webhook (best effort)
     configurarWebhookWaAction().catch(() => {})
 
-    // Com phone → paircode; sem phone → QR Code
     const tel = usePaircode && phoneInput.trim() ? phoneInput.trim() : undefined
     const conectarRes = await conectarWaAction(tel)
+    logReqRes('conectar', conectarRes)
     stopCountdown()
 
     if ('error' in conectarRes) {
-      setStatus('error')
+      safeSetStatus('error')
       setErrorMsg(conectarRes.error)
       return
     }
+    if ('already_connected' in conectarRes) {
+      const statusRes = await getStatusWaAction()
+      logReqRes('getStatus [already_connected]', statusRes)
+      applyStatus(statusRes)
+      if (!('error' in statusRes) && statusRes.status === 'connected') {
+        showToast('WhatsApp já está conectado! ✓')
+      }
+      return
+    }
     if ('qrcode' in conectarRes) {
-      setStatus('qrcode'); setQrcode(conectarRes.qrcode); startPolling()
+      safeSetStatus('qrcode'); setQrcode(conectarRes.qrcode); startPolling()
     } else {
-      setStatus('paircode'); setPaircode(conectarRes.paircode); startPolling()
+      safeSetStatus('paircode'); setPaircode(conectarRes.paircode); startPolling()
     }
   }
 
   // ── Gerar novo QR / reconectar ────────────────────────────────────────
   async function handleNovoQr() {
-    setStatus('loading')
-    startCountdown()
     stopPolling()
+    setQrcode(null)
+    setPaircode(null)
+    safeSetStatus('loading')
+    startCountdown()
 
     const tel = usePaircode && phoneInput.trim() ? phoneInput.trim() : undefined
     const res = await conectarWaAction(tel)
+    logReqRes('conectar', res)
     stopCountdown()
 
     if ('error' in res) {
-      setStatus('error'); setErrorMsg(res.error); return
+      safeSetStatus('error'); setErrorMsg(res.error); return
+    }
+    if ('already_connected' in res) {
+      const statusRes = await getStatusWaAction()
+      logReqRes('getStatus [already_connected]', statusRes)
+      applyStatus(statusRes)
+      return
     }
     if ('qrcode' in res) {
-      setStatus('qrcode'); setQrcode(res.qrcode); startPolling()
+      safeSetStatus('qrcode'); setQrcode(res.qrcode); startPolling()
     } else {
-      setStatus('paircode'); setPaircode(res.paircode); startPolling()
+      safeSetStatus('paircode'); setPaircode(res.paircode); startPolling()
     }
   }
 
-  // ── Desconectar ──────────────────────────────────────────────────────────
+  // ── Desconectar + excluir instância ─────────────────────────────────────
   async function handleDesconectar() {
-    const res = await desconectarWaAction()
-    if ('error' in res) { showToast(res.error, false); return }
-    setStatus('disconnected')
-    setPhone(null)
-    showToast('Dispositivo desconectado.')
-  }
-
-  // ── Excluir instância ────────────────────────────────────────────────────
-  async function handleExcluir() {
-    if (!confirming) { setConfirming(true); return }
-    setConfirming(false)
+    await desconectarWaAction()          // best effort — ignora erro
     const res = await excluirInstanciaWaAction()
     if ('error' in res) { showToast(res.error, false); return }
-    setStatus('no_instance')
+    safeSetStatus('no_instance')
     setInstanceId(null)
     setPhone(null)
-    showToast('Instância excluída.')
+    setQrcode(null)
+    showToast('Dispositivo desconectado e instância removida.')
   }
 
   // ── Sincronizar webhook ──────────────────────────────────────────────────
   async function handleWebhook() {
-    const res = await configurarWebhookWaAction()
+    const res = await configurarWebhookWaAction(urlManual || undefined)
     if ('error' in res) { showToast(res.error, false); return }
-    showToast('Webhook sincronizado com sucesso!')
+    setWebhookUrl(res.url)
+    showToast('Webhook configurado! Mensagens recebidas chegarão ao Painel.')
+  }
+
+  // ── Ver webhook atual ────────────────────────────────────────────────────
+  async function handleVerWebhook() {
+    const res = await verWebhookWaAction()
+    if ('error' in res) { showToast(res.error, false); return }
+    const urls = res.data.map((w: any) => w.url).filter(Boolean)
+    setWebhookAtual(urls.length > 0 ? urls.join('\n') : 'Nenhum webhook configurado')
+  }
+
+  // ── Ver erros de entrega do webhook ──────────────────────────────────────
+  async function handleVerErros() {
+    setLoadingErros(true)
+    const res = await verWebhookErrosWaAction()
+    setLoadingErros(false)
+    if ('error' in res) { showToast(res.error, false); return }
+    setWebhookErros(res.data)
+    setCapturaDesde(res.capturaDesde)
   }
 
   // ─── Ícone do header por estado ─────────────────────────────────────────
@@ -547,15 +684,7 @@ export function ConexaoTab() {
             <Btn variant="teal" full onClick={handleNovoQr}>
               Gerar Novo QR Code
             </Btn>
-            <Btn variant="danger" onClick={handleExcluir}>
-              {confirming ? 'Confirmar exclusão' : 'Excluir Instância'}
-            </Btn>
           </div>
-          {confirming && (
-            <button onClick={() => setConfirming(false)} className="mt-2 text-xs text-[#94A3B8] hover:underline">
-              Cancelar
-            </button>
-          )}
         </div>
       )
     }
@@ -563,7 +692,7 @@ export function ConexaoTab() {
     // ── Conectado ──
     if (status === 'connected') {
       return (
-        <div className="flex flex-col items-center py-12 text-center">
+        <div className="flex flex-col items-center py-8 text-center">
           <div className="w-16 h-16 rounded-full flex items-center justify-center mb-3"
             style={{ background: '#DCFCE7', color: '#16A34A' }}>
             <div className="w-9 h-9"><IconCheck /></div>
@@ -571,19 +700,123 @@ export function ConexaoTab() {
           <Badge color="green">Conectado</Badge>
           <p className="mt-4 text-2xl font-bold text-[#2C3E50]">{phone}</p>
           <p className="mt-1 text-sm text-[#7F8C8D]">O envio automático está ativo usando este número.</p>
-          <div className="mt-8 flex gap-3">
+
+          {/* Painel de Webhook */}
+          <div className="mt-6 w-full max-w-md text-left rounded-xl border border-[#E2E8F0] overflow-hidden">
+            <div className="px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between">
+              <p className="text-xs font-semibold text-[#475569] uppercase tracking-wide">Webhook — Mensagens Recebidas</p>
+              <button onClick={handleVerWebhook} className="text-xs text-[#0ea5e9] hover:underline font-medium">
+                Ver atual
+              </button>
+            </div>
+            <div className="px-4 py-3 space-y-2.5">
+              {/* URL atual configurada na UAZAPI */}
+              {webhookAtual && (
+                <div className="p-2.5 rounded-lg bg-[#F1F5F9]">
+                  <p className="text-[10px] font-semibold text-[#64748B] mb-1">URL configurada na UAZAPI:</p>
+                  <p className="text-[10px] font-mono text-[#334155] break-all">{webhookAtual}</p>
+                </div>
+              )}
+              {/* Confirmação após sincronizar */}
+              {webhookUrl && (
+                <div className="p-2.5 rounded-lg bg-[#DCFCE7]">
+                  <p className="text-[10px] font-semibold text-[#16A34A] mb-1">✓ Webhook sincronizado:</p>
+                  <p className="text-[10px] font-mono text-[#166534] break-all">{webhookUrl}</p>
+                </div>
+              )}
+              {/* Campo de URL manual */}
+              <div>
+                <p className="text-[10px] text-[#64748B] font-medium mb-1">URL base do sistema (opcional)</p>
+                <input
+                  type="url"
+                  value={urlManual}
+                  onChange={e => setUrlManual(e.target.value)}
+                  placeholder="https://seudominio.com"
+                  className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-xs font-mono focus:outline-none focus:border-[#0ea5e9] focus:ring-1 focus:ring-[#0ea5e9]/30"
+                />
+                <p className="text-[10px] text-[#94A3B8] mt-1">
+                  Deixe vazio para sincronizar apenas os eventos sem alterar a URL já configurada.
+                </p>
+              </div>
+              <button
+                onClick={handleWebhook}
+                className="w-full py-2 rounded-lg bg-[#0ea5e9] text-white text-xs font-semibold hover:bg-[#0284c7] transition-colors flex items-center justify-center gap-1.5"
+              >
+                <IconZap /> Sincronizar Webhook
+              </button>
+            </div>
+          </div>
+
+          {/* Painel de Erros do Webhook */}
+          <div className="mt-4 w-full max-w-md text-left rounded-xl border border-[#E2E8F0] overflow-hidden">
+            <div className="px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between">
+              <p className="text-xs font-semibold text-[#475569] uppercase tracking-wide">Erros de Entrega do Webhook</p>
+              <button
+                onClick={handleVerErros}
+                disabled={loadingErros}
+                className="text-xs text-[#DC2626] hover:underline font-medium disabled:opacity-50"
+              >
+                {loadingErros ? 'Verificando…' : 'Ver erros'}
+              </button>
+            </div>
+
+            {webhookErros !== null && (
+              <div className="divide-y divide-[#F1F5F9]">
+                {capturaDesde && (
+                  <p className="px-4 py-2 text-[10px] text-[#94A3B8]">
+                    Captura iniciada em: {new Date(capturaDesde).toLocaleString('pt-BR')}
+                  </p>
+                )}
+                {webhookErros.length === 0 ? (
+                  <div className="px-4 py-4 text-center">
+                    <p className="text-xs text-[#16A34A] font-medium">✓ Nenhum erro de entrega registrado</p>
+                    <p className="text-[10px] text-[#94A3B8] mt-1">O webhook está funcionando corretamente.</p>
+                  </div>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto">
+                    {webhookErros.map((e, i) => (
+                      <div key={i} className="px-4 py-3 hover:bg-[#FEF2F2]">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="text-[10px] font-semibold text-[#DC2626] truncate">{e.evento || '(sem evento)'}</span>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {e.httpStatus && (
+                              <span className="text-[10px] font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
+                                HTTP {e.httpStatus}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-[#94A3B8]">
+                              {e.tentativas} tentativa{e.tentativas !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] font-mono text-[#64748B] truncate mb-0.5">{e.url}</p>
+                        {e.erro && (
+                          <p className="text-[10px] text-[#DC2626] break-words">{e.erro}</p>
+                        )}
+                        {e.created && (
+                          <p className="text-[10px] text-[#94A3B8] mt-0.5">
+                            {new Date(e.created).toLocaleString('pt-BR')}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {webhookErros === null && (
+              <p className="px-4 py-3 text-[10px] text-[#94A3B8]">
+                Clique em "Ver erros" para verificar se há falhas na entrega de mensagens.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-5">
             <Btn variant="outline" onClick={handleDesconectar}>
               Desconectar Dispositivo
             </Btn>
-            <Btn variant="danger" onClick={handleExcluir}>
-              {confirming ? 'Confirmar exclusão' : 'Excluir Instância'}
-            </Btn>
           </div>
-          {confirming && (
-            <button onClick={() => setConfirming(false)} className="mt-2 text-xs text-[#94A3B8] hover:underline">
-              Cancelar
-            </button>
-          )}
         </div>
       )
     }
@@ -604,7 +837,7 @@ export function ConexaoTab() {
               {errorMsg}
             </p>
           )}
-          <Btn onClick={() => { setStatus('no_instance'); setErrorMsg(null) }}>
+          <Btn onClick={() => { safeSetStatus('no_instance'); setErrorMsg(null) }}>
             Voltar
           </Btn>
         </div>
@@ -642,7 +875,7 @@ export function ConexaoTab() {
           <div className="flex items-center gap-2">
             {/* Badge do ID */}
             <Badge color="gray">
-              {instanceId ? instanceId.slice(0, 14) : 'Sem ID'}
+              {instanceId ?? 'Sem ID'}
             </Badge>
             {/* Botão webhook */}
             <button
@@ -668,6 +901,7 @@ export function ConexaoTab() {
           <Body />
         </div>
       </div>
+
     </div>
   )
 }

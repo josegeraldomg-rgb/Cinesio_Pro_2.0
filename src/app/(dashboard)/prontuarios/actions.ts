@@ -37,7 +37,9 @@ export interface ProntuarioDetalhe {
   }
 }
 
-export type TipoRegistro = 'evolucao' | 'plano'
+// Tipos de registro na timeline — todos persistidos em evolucoes_clinicas
+// com prefixo no campo `conteudo`: "PRESCRICAO:{...json}", "LAUDO:{...json}", etc.
+export type TipoRegistro = 'evolucao' | 'plano' | 'prescricao' | 'laudo' | 'atestado' | 'anexo' | 'copiloto'
 
 export interface RegistroTimeline {
   id:                string
@@ -48,7 +50,32 @@ export interface RegistroTimeline {
   dados:             Record<string, unknown>
 }
 
-// ─── Listar pacientes com contagem de registros ───────────────────────────────
+// ─── Parser interno de conteúdo ───────────────────────────────────────────────
+
+const DOC_PREFIXES: TipoRegistro[] = ['prescricao', 'laudo', 'atestado', 'anexo', 'copiloto']
+
+function parseConteudo(conteudo: string): { tipo: TipoRegistro; dados: Record<string, unknown>; resumo: string } {
+  for (const tipo of DOC_PREFIXES) {
+    const prefix = tipo.toUpperCase() + ':'
+    if (conteudo.startsWith(prefix)) {
+      try {
+        const dados = JSON.parse(conteudo.slice(prefix.length)) as Record<string, unknown>
+        let resumo = ''
+        if (tipo === 'prescricao') resumo = String(dados.medicamentos ?? '').slice(0, 100)
+        if (tipo === 'laudo')      resumo = String(dados.titulo ?? 'Laudo Técnico')
+        if (tipo === 'atestado')   resumo = `Atestado${dados.dias ? ` — ${dados.dias} dia(s)` : ''}`
+        if (tipo === 'anexo')      resumo = String(dados.nome ?? 'Arquivo anexado')
+        if (tipo === 'copiloto')   resumo = String(dados.queixa ?? 'Registro por IA').slice(0, 100)
+        return { tipo, dados, resumo }
+      } catch {
+        return { tipo: 'evolucao', dados: { conteudo }, resumo: conteudo.slice(0, 120) }
+      }
+    }
+  }
+  return { tipo: 'evolucao', dados: { conteudo }, resumo: conteudo.slice(0, 120) }
+}
+
+// ─── Listar pacientes ─────────────────────────────────────────────────────────
 export async function listarPacientesAction(): Promise<
   { data: PacienteResumo[] } | { error: string }
 > {
@@ -74,7 +101,6 @@ export async function listarPacientesAction(): Promise<
 
     const countMap: Record<string, number> = {}
     for (const id of ids) countMap[id] = 0
-
     for (const row of [...(evols.data ?? []), ...(planos.data ?? [])]) {
       const pid = (row as { paciente_id: string }).paciente_id
       if (pid in countMap) countMap[pid]++
@@ -100,7 +126,7 @@ export async function listarPacientesAction(): Promise<
   }
 }
 
-// ─── Buscar / criar prontuário de um paciente ─────────────────────────────────
+// ─── Buscar / criar prontuário ────────────────────────────────────────────────
 export async function buscarProntuarioAction(pacienteId: string): Promise<
   { data: ProntuarioDetalhe } | { error: string }
 > {
@@ -118,7 +144,6 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
     if (pacErr) return { error: pacErr.message }
     if (!pac)   return { error: 'Paciente não encontrado.' }
 
-    // Busca ou cria prontuário
     let { data: pron, error: pronErr } = await admin
       .from('prontuarios')
       .select('id, alergias, antecedentes, medicamentos')
@@ -165,7 +190,7 @@ export async function buscarProntuarioAction(pacienteId: string): Promise<
   }
 }
 
-// ─── Timeline unificada ───────────────────────────────────────────────────────
+// ─── Timeline ─────────────────────────────────────────────────────────────────
 export async function listarTimelineAction(
   pacienteId: string,
   filtro: TipoRegistro | 'todos' = 'todos',
@@ -176,14 +201,19 @@ export async function listarTimelineAction(
 
     const base = { empresa_id: empresaId, paciente_id: pacienteId }
 
+    // Registros que vêm de evolucoes_clinicas (todos os tipos de documento)
+    const docTypes: TipoRegistro[] = ['evolucao', 'prescricao', 'laudo', 'atestado', 'anexo', 'copiloto']
+    const incluirEvols = filtro === 'todos' || docTypes.includes(filtro as TipoRegistro)
+    const incluirPlano = filtro === 'todos' || filtro === 'plano'
+
     const [evols, planos] = await Promise.all([
-      filtro === 'todos' || filtro === 'evolucao'
+      incluirEvols
         ? admin.from('evolucoes_clinicas')
             .select('id, conteudo, data_atendimento, criado_em:created_at, profissionais(nome)')
-            .match(base).order('data_atendimento', { ascending: false }).limit(100)
+            .match(base).order('data_atendimento', { ascending: false }).limit(200)
         : Promise.resolve({ data: [] }),
 
-      filtro === 'todos' || filtro === 'plano'
+      incluirPlano
         ? admin.from('planos_tratamento')
             .select('id, diagnostico_clinico, cid10, status, data_inicio, sessoes_previstas, sessoes_realizadas, criado_em:created_at, profissionais(nome)')
             .match(base).order('created_at', { ascending: false }).limit(100)
@@ -193,39 +223,43 @@ export async function listarTimelineAction(
     const registros: RegistroTimeline[] = []
 
     for (const row of (evols.data ?? []) as Record<string, unknown>[]) {
+      const conteudo = String(row.conteudo ?? '')
+      const { tipo, dados, resumo } = parseConteudo(conteudo)
+
+      // Se filtrando por tipo específico, pular os que não batem
+      if (filtro !== 'todos' && filtro !== tipo) continue
+
       const prof = (row.profissionais as { nome?: string } | null)?.nome ?? null
       registros.push({
         id:                row.id as string,
-        tipo:              'evolucao',
+        tipo,
         criado_em:         ((row.data_atendimento ?? row.criado_em) as string),
         profissional_nome: prof,
-        resumo:            String(row.conteudo ?? '').slice(0, 120),
-        dados:             row,
+        resumo,
+        dados,
       })
     }
 
     for (const row of (planos.data ?? []) as Record<string, unknown>[]) {
       const prof = (row.profissionais as { nome?: string } | null)?.nome ?? null
-      const resumo = String(row.diagnostico_clinico ?? 'Plano de Tratamento').slice(0, 120)
       registros.push({
         id:                row.id as string,
         tipo:              'plano',
         criado_em:         row.criado_em as string,
         profissional_nome: prof,
-        resumo,
+        resumo:            String(row.diagnostico_clinico ?? 'Plano de Tratamento').slice(0, 120),
         dados:             row,
       })
     }
 
     registros.sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())
-
     return { data: registros }
   } catch (e: unknown) {
     return { error: (e as Error).message ?? 'Erro ao carregar timeline' }
   }
 }
 
-// ─── Atualizar campos do prontuário (alergias, antecedentes, medicamentos) ────
+// ─── Salvar prontuário base ───────────────────────────────────────────────────
 export async function salvarProntuarioAction(
   prontuarioId: string,
   payload: { alergias?: string; antecedentes?: string; medicamentos?: string },
@@ -268,6 +302,36 @@ export async function salvarEvolucaoAction(
     return { success: true, id: data.id }
   } catch (e: unknown) {
     return { error: (e as Error).message ?? 'Erro ao salvar evolução' }
+  }
+}
+
+// ─── Documento genérico (Prescrição / Laudo / Atestado / Anexo / Copiloto) ────
+// Salvo como evolucoes_clinicas com prefixo: "TIPO:{json}"
+export async function salvarDocumentoAction(
+  pacienteId: string,
+  tipo: 'prescricao' | 'laudo' | 'atestado' | 'anexo' | 'copiloto',
+  dados: Record<string, unknown>,
+  profissional_id?: string | null,
+): Promise<{ success: true; id: string } | { error: string }> {
+  try {
+    const { empresaId } = await getEmpresaId()
+    const admin = createAdminClient()
+    const conteudo = tipo.toUpperCase() + ':' + JSON.stringify(dados)
+    const { data, error } = await admin
+      .from('evolucoes_clinicas')
+      .insert({
+        empresa_id:       empresaId,
+        paciente_id:      pacienteId,
+        profissional_id:  profissional_id ?? null,
+        conteudo,
+        data_atendimento: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+    if (error) return { error: error.message }
+    return { success: true, id: data.id }
+  } catch (e: unknown) {
+    return { error: (e as Error).message ?? 'Erro ao salvar documento' }
   }
 }
 

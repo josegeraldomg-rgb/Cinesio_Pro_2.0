@@ -330,7 +330,7 @@ export async function configurarWebhookWaAction(customUrl?: string): Promise<
     await uazapiInstance(cfg.instance_token, '/webhook', 'POST', {
       url:                 webhookUrl,
       enabled:             true,
-      events:              ['messages', 'messages_update', 'connection'],
+      events:              ['messages', 'messages_update', 'message.ack', 'connection'],
       excludeMessages:     ['wasSentByApi'],  // ⚠️ evita loop: mensagens enviadas por API não voltam como evento
       addUrlEvents:        false,
       addUrlTypesMessages: false,
@@ -394,6 +394,68 @@ export async function verWebhookErrosWaAction(): Promise<
     return { data: lista, capturaDesde }
   } catch (e: any) {
     return { error: e.message ?? 'Erro ao buscar erros do webhook' }
+  }
+}
+
+/**
+ * Envia uma mensagem de boas-vindas para o próprio número conectado,
+ * confirmando que a via de mão dupla (envio + recebimento) está ativa.
+ * Fire-and-forget — falhas são silenciosas.
+ */
+export async function enviarBoasVindasAction(jid: string): Promise<void> {
+  try {
+    const { empresaId } = await getEmpresaId()
+    const cfg = await getConfig(empresaId)
+    if (!cfg?.instance_token || !UAZAPI_URL) return
+
+    const number = jid.split('@')[0].split(':')[0]  // extrai apenas os dígitos
+    await fetch(`${UAZAPI_URL}/send/text`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'token': cfg.instance_token },
+      body:    JSON.stringify({
+        number,
+        text: '✅ *CinesioPro Conectado!*\n\nSeu WhatsApp foi vinculado com sucesso ao sistema. A partir de agora, você poderá enviar e receber mensagens dos pacientes diretamente pelo Painel.',
+      }),
+      cache: 'no-store',
+    })
+  } catch {}
+}
+
+/**
+ * Envia uma mensagem de texto via UAZAPI para um número específico.
+ * Usado pelo modal de envio de formulários e outros fluxos da plataforma.
+ * Retorna { ok: true } se enviado, ou { error, fallbackUrl } para o cliente abrir wa.me.
+ */
+export async function enviarTextWaAction(
+  number: string,   // apenas dígitos, ex: "5531999990000"
+  text:   string,
+): Promise<
+  | { ok: true }
+  | { error: string; fallbackUrl: string }
+> {
+  const fallbackUrl = `https://wa.me/${number}?text=${encodeURIComponent(text)}`
+  try {
+    if (!isConfigured()) return { error: 'UAZAPI não configurado', fallbackUrl }
+
+    const { empresaId } = await getEmpresaId()
+    const cfg = await getConfig(empresaId)
+    if (!cfg?.instance_token) return { error: 'Nenhuma instância WhatsApp encontrada', fallbackUrl }
+
+    const res = await fetch(`${UAZAPI_URL}/send/text`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'token': cfg.instance_token },
+      body:    JSON.stringify({ number, text }),
+      cache:   'no-store',
+    })
+
+    if (!res.ok) {
+      const raw = await res.text()
+      return { error: `UAZAPI ${res.status}: ${raw.slice(0, 120)}`, fallbackUrl }
+    }
+
+    return { ok: true }
+  } catch (e: any) {
+    return { error: e.message ?? 'Erro ao enviar mensagem', fallbackUrl }
   }
 }
 

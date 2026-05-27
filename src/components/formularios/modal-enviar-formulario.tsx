@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CATEGORIAS } from '@/lib/formularios/tipos'
+import { enviarTextWaAction } from '@/app/(dashboard)/whatsapp/actions'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Paciente { id: string; nome: string; ddi: string | null; telefone: string | null; email: string | null }
@@ -242,6 +243,9 @@ export function ModalEnviarFormulario({
   const [linkGerado,    setLinkGerado]    = useState('')
   const [copiado,       setCopiado]       = useState(false)
   const [envioId,       setEnvioId]       = useState('')
+  const [waSending,     setWaSending]     = useState(false)
+  const [waEnviado,     setWaEnviado]     = useState(false)
+  const [waErro,        setWaErro]        = useState<string | null>(null)
 
   // ── Handlers ────────────────────────────────────────────────────────────
   function selecionarPaciente(p: Paciente) {
@@ -293,11 +297,23 @@ export function ModalEnviarFormulario({
     setTimeout(() => setCopiado(false), 2000)
   }
 
-  function abrirWhatsApp() {
+  async function abrirWhatsApp() {
     const fone = fmtFone(pDdi, pTel)
     if (!fone) return
     const msg = `Olá, ${pNome}! 👋\n\nPor favor, preencha o formulário *${fNome}* antes da sua próxima consulta:\n\n🔗 ${linkGerado}\n\nQualquer dúvida, estamos à disposição!`
-    window.open(whatsappUrl(fone, msg), '_blank')
+
+    setWaSending(true)
+    setWaErro(null)
+    const result = await enviarTextWaAction(fone, msg)
+    setWaSending(false)
+
+    if ('ok' in result) {
+      setWaEnviado(true)
+    } else {
+      // UAZAPI indisponível ou desconectado — abre wa.me como fallback
+      setWaErro(result.error)
+      window.open(result.fallbackUrl, '_blank')
+    }
   }
 
   function abrirEmail() {
@@ -487,11 +503,24 @@ export function ModalEnviarFormulario({
               {pTel && (
                 <button
                   onClick={abrirWhatsApp}
-                  className="flex items-center justify-center gap-2.5 w-full py-3 rounded-xl font-semibold text-sm text-white transition-opacity hover:opacity-90"
-                  style={{ background: '#25d366' }}
+                  disabled={waSending || waEnviado}
+                  className="flex items-center justify-center gap-2.5 w-full py-3 rounded-xl font-semibold text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-70"
+                  style={{ background: waEnviado ? '#16a34a' : '#25d366' }}
                 >
-                  <MessageCircle size={18} /> Enviar via WhatsApp
+                  {waSending ? (
+                    <><Loader2 size={16} className="animate-spin" /> Enviando...</>
+                  ) : waEnviado ? (
+                    <><CheckCheck size={16} /> Enviado com sucesso!</>
+                  ) : (
+                    <><MessageCircle size={18} /> Enviar via WhatsApp</>
+                  )}
                 </button>
+              )}
+              {waErro && (
+                <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                  <AlertCircle size={12} className="flex-shrink-0" />
+                  WhatsApp automático indisponível — o link foi aberto no navegador.
+                </p>
               )}
               {pEmail && (
                 <button

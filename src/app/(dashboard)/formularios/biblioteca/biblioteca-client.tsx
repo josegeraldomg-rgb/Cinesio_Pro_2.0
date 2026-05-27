@@ -10,6 +10,7 @@ import {
 import { BIBLIOTECA, type FormularioMeta } from '@/lib/formularios/biblioteca-metadata'
 import { CATEGORIAS } from '@/lib/formularios/tipos'
 import { MapaCorporal, ZONA_NOMES } from '@/components/formularios/mapa-corporal'
+import { CAMPOS_BIBLIOTECA } from '@/lib/formularios/campos-biblioteca'
 
 // ─── Diálogo de confirmação de duplicação ─────────────────────────────────────
 function ModalDuplicar({
@@ -170,7 +171,7 @@ export function BibliotecaClient() {
           nome:       duplicando.nome,
           descricao:  duplicando.descricao,
           categoria:  duplicando.categoria,
-          campos_json: [],   // campos detalhados carregados pelo editor na Fase 3
+          campos_json: CAMPOS_BIBLIOTECA[duplicando.id] ?? [],
           status:     'rascunho',
         }),
       })

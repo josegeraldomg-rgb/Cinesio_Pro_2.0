@@ -408,21 +408,21 @@ export const BIBLIOTECA: FormularioMeta[] = [
 
   // ── CONSENTIMENTOS ────────────────────────────────────────────────────────
   {
-    id: 'bib-043', categoria: 'consentimentos', num_campos: 8, pontuavel: false,
+    id: 'bib-043', categoria: 'consentimentos', num_campos: 12, pontuavel: false,
     nome: 'Termo de Consentimento Informado para Fisioterapia',
     descricao: 'LGPD-compliant. Autoriza o tratamento, coleta de dados, uso de imagem para fins clínicos e esclarece riscos e benefícios. Inclui assinatura digital.',
     tags: ['TCLE', 'consentimento', 'LGPD', 'assinatura'],
     partes_corpo: ['geral'],
   },
   {
-    id: 'bib-044', categoria: 'consentimentos', num_campos: 7, pontuavel: false,
+    id: 'bib-044', categoria: 'consentimentos', num_campos: 13, pontuavel: false,
     nome: 'Termo de Consentimento para Teleconsulta',
     descricao: 'Específico para atendimento remoto. Cobre privacidade da sessão, limitações do teleatendimento, tratamento de dados digitais e direito de cancelamento.',
     tags: ['teleconsulta', 'telemedicina', 'LGPD', 'remoto'],
     partes_corpo: ['geral'],
   },
   {
-    id: 'bib-045', categoria: 'consentimentos', num_campos: 10, pontuavel: false,
+    id: 'bib-045', categoria: 'consentimentos', num_campos: 16, pontuavel: false,
     nome: 'Anamnese de Retorno / Follow-up',
     descricao: 'Para reavaliar pacientes após alta ou intervalo prolongado: mudanças no quadro, novos sintomas, adesão a exercícios domiciliares e novos objetivos.',
     tags: ['retorno', 'follow-up', 'reavaliação', 'pós-alta'],

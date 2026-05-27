@@ -289,4 +289,176 @@ export const CAMPOS_BIBLIOTECA: Record<string, CampoFormulario[]> = {
     { id: 'b09c14', tipo: 'assinatura', label: 'Assinatura do Fisioterapeuta' },
   ],
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // CONSENTIMENTOS
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // ── bib-043: Termo de Consentimento Informado para Fisioterapia ──────────
+  'bib-043': [
+    {
+      id: 'b43c01', tipo: 'instrucao',
+      label: 'Leia atentamente antes de assinar',
+      descricao:
+        'Eu, abaixo identificado(a), declaro que fui devidamente esclarecido(a) pelo(a) fisioterapeuta ' +
+        'sobre os objetivos, procedimentos, possíveis desconfortos e benefícios do tratamento fisioterapêutico. ' +
+        'Compreendo que tenho o direito de interromper o tratamento a qualquer momento, sem prejuízo no meu atendimento.\n\n' +
+        'Em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018), autorizo o tratamento dos ' +
+        'meus dados pessoais e de saúde exclusivamente para fins clínicos e de acompanhamento terapêutico. ' +
+        'Esses dados serão armazenados com segurança e não serão compartilhados com terceiros sem meu consentimento prévio.\n\n' +
+        'Em caso de dúvidas, entre em contato com a clínica antes de assinar.',
+    },
+    { id: 'b43c02', tipo: 'secao', label: 'Identificação do Paciente' },
+    {
+      id: 'b43c03', tipo: 'texto_curto', label: 'Nome Completo do Paciente',
+      obrigatorio: true, descricao: 'Conforme documento de identidade.',
+    },
+    { id: 'b43c04', tipo: 'data', label: 'Data de Nascimento', obrigatorio: true },
+    { id: 'b43c05', tipo: 'texto_curto', label: 'CPF', descricao: 'Formato: 000.000.000-00', obrigatorio: true },
+    { id: 'b43c06', tipo: 'secao', label: 'Declarações e Autorizações' },
+    {
+      id: 'b43c07', tipo: 'selecao_unica',
+      label: 'Autorizo a realização do tratamento fisioterapêutico proposto.',
+      obrigatorio: true,
+      opcoes: ['Sim, autorizo', 'Não autorizo'],
+    },
+    {
+      id: 'b43c08', tipo: 'selecao_unica',
+      label: 'Autorizo o tratamento dos meus dados pessoais e de saúde para fins clínicos (LGPD).',
+      obrigatorio: true,
+      opcoes: ['Sim, autorizo', 'Não autorizo'],
+    },
+    {
+      id: 'b43c09', tipo: 'selecao_unica',
+      label: 'Autorizo o registro de imagens e vídeos da avaliação/tratamento para uso clínico e educacional interno.',
+      opcoes: ['Sim, autorizo', 'Não autorizo'],
+    },
+    {
+      id: 'b43c10', tipo: 'texto_longo',
+      label: 'Restrições, condições especiais ou observações',
+      descricao: 'Informe caso haja condições que limitem algum procedimento ou restrições específicas.',
+    },
+    { id: 'b43c11', tipo: 'data', label: 'Data', obrigatorio: true },
+    { id: 'b43c12', tipo: 'assinatura', label: 'Assinatura do Paciente (ou responsável)', obrigatorio: true },
+  ],
+
+  // ── bib-044: Termo de Consentimento para Teleconsulta ───────────────────
+  'bib-044': [
+    {
+      id: 'b44c01', tipo: 'instrucao',
+      label: 'Informações sobre o Atendimento Remoto',
+      descricao:
+        'A teleconsulta é uma modalidade de atendimento fisioterapêutico realizada à distância por meio de ' +
+        'plataformas de videoconferência, autorizada pela Resolução COFFITO nº 516/2018. ' +
+        'Declaro ciência de que:\n\n' +
+        '• O atendimento online possui limitações em relação à avaliação física presencial;\n' +
+        '• A sessão ocorrerá em plataforma segura e as imagens não serão gravadas sem meu consentimento;\n' +
+        '• Sou responsável por garantir um local privado, silencioso e com boa iluminação durante a sessão;\n' +
+        '• Meus dados serão tratados em conformidade com a LGPD (Lei nº 13.709/2018);\n' +
+        '• Posso solicitar o cancelamento do atendimento a qualquer momento, sem prejuízo.\n\n' +
+        'Em caso de emergência durante a sessão, ligue imediatamente para o SAMU (192).',
+    },
+    { id: 'b44c02', tipo: 'secao', label: 'Identificação do Paciente' },
+    {
+      id: 'b44c03', tipo: 'texto_curto', label: 'Nome Completo do Paciente',
+      obrigatorio: true,
+    },
+    { id: 'b44c04', tipo: 'data', label: 'Data de Nascimento', obrigatorio: true },
+    { id: 'b44c05', tipo: 'texto_curto', label: 'CPF', obrigatorio: true },
+    { id: 'b44c06', tipo: 'secao', label: 'Condições do Atendimento Remoto' },
+    {
+      id: 'b44c07', tipo: 'selecao_unica',
+      label: 'Confirmo que estarei em um local privado, com boa iluminação e conexão de internet estável durante a sessão.',
+      obrigatorio: true,
+      opcoes: ['Sim, confirmo', 'Não consigo garantir'],
+    },
+    {
+      id: 'b44c08', tipo: 'selecao_unica',
+      label: 'Plataforma de videoconferência que será utilizada:',
+      opcoes: ['Google Meet', 'Zoom', 'WhatsApp Videochamada', 'Microsoft Teams', 'Outra'],
+    },
+    {
+      id: 'b44c09', tipo: 'selecao_unica',
+      label: 'Autorizo a gravação da sessão exclusivamente para revisão clínica e arquivamento no prontuário.',
+      opcoes: ['Sim, autorizo', 'Não autorizo'],
+    },
+    { id: 'b44c10', tipo: 'secao', label: 'Consentimento' },
+    {
+      id: 'b44c11', tipo: 'selecao_unica',
+      label: 'Autorizo a realização do atendimento fisioterapêutico por teleconsulta e o tratamento dos meus dados (LGPD).',
+      obrigatorio: true,
+      opcoes: ['Sim, autorizo', 'Não autorizo'],
+    },
+    { id: 'b44c12', tipo: 'data', label: 'Data', obrigatorio: true },
+    { id: 'b44c13', tipo: 'assinatura', label: 'Assinatura do Paciente', obrigatorio: true },
+  ],
+
+  // ── bib-045: Anamnese de Retorno / Follow-up ─────────────────────────────
+  'bib-045': [
+    { id: 'b45c01', tipo: 'secao', label: 'Informações do Retorno' },
+    { id: 'b45c02', tipo: 'data', label: 'Data do Retorno', obrigatorio: true },
+    { id: 'b45c03', tipo: 'texto_curto', label: 'Data do Último Atendimento (aproximada)',
+      descricao: 'Ex: 01/03/2025' },
+    {
+      id: 'b45c04', tipo: 'secao', label: 'Evolução Clínica',
+    },
+    {
+      id: 'b45c05', tipo: 'escala_numerica',
+      label: 'Intensidade da Dor Atual (0–10)',
+      min: 0, max: 10,
+      rotulos: { min: 'Sem dor', max: 'Dor insuportável' },
+      obrigatorio: true,
+    },
+    {
+      id: 'b45c06', tipo: 'selecao_unica',
+      label: 'Como você avalia sua evolução desde o último atendimento?',
+      obrigatorio: true,
+      opcoes: [
+        'Muito melhor — melhora significativa',
+        'Melhor — melhora perceptível',
+        'Igual — sem alteração',
+        'Pior — piora leve',
+        'Muito pior — piora importante',
+      ],
+    },
+    {
+      id: 'b45c07', tipo: 'selecao_unica',
+      label: 'Realizou os exercícios domiciliares prescritos?',
+      opcoes: ['Sim, todos os dias', 'Sim, alguns dias', 'Raramente', 'Não realizei', 'Não foram prescritos'],
+    },
+    {
+      id: 'b45c08', tipo: 'texto_longo',
+      label: 'O que mudou desde o último atendimento?',
+      descricao: 'Descreva qualquer melhora, piora ou alteração que percebeu no seu quadro.',
+    },
+    { id: 'b45c09', tipo: 'secao', label: 'Novos Sintomas e Intercorrências' },
+    {
+      id: 'b45c10', tipo: 'texto_longo',
+      label: 'Novos sintomas ou queixas que surgiram no período?',
+      descricao: 'Informe qualquer sintoma novo, mesmo que não relacionado ao tratamento principal.',
+    },
+    {
+      id: 'b45c11', tipo: 'selecao_unica',
+      label: 'Realizou consulta médica ou de outros profissionais de saúde no período?',
+      opcoes: ['Não', 'Sim — médico clínico geral', 'Sim — ortopedista', 'Sim — neurologista', 'Sim — outro especialista'],
+    },
+    {
+      id: 'b45c12', tipo: 'texto_curto',
+      label: 'Novos medicamentos iniciados ou alterados?',
+      descricao: 'Informe nome e dose se souber.',
+    },
+    { id: 'b45c13', tipo: 'secao', label: 'Objetivos e Satisfação' },
+    {
+      id: 'b45c14', tipo: 'texto_longo',
+      label: 'Quais são seus objetivos para este período de tratamento?',
+      descricao: 'Ex: retornar ao esporte, diminuir dor, melhorar mobilidade.',
+    },
+    {
+      id: 'b45c15', tipo: 'escala_numerica',
+      label: 'Satisfação geral com o tratamento até o momento (0–10)',
+      min: 0, max: 10,
+      rotulos: { min: 'Insatisfeito', max: 'Muito satisfeito' },
+    },
+    { id: 'b45c16', tipo: 'assinatura', label: 'Assinatura do Paciente' },
+  ],
+
 }

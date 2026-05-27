@@ -90,6 +90,7 @@ const TIPO_META: Record<TipoRegistro, { label: string; color: string; bg: string
   atestado:   { label: 'Atestado',         color: '#065F46', bg: '#D1FAE5', icon: 'stethoscope'      },
   anexo:      { label: 'Anexo',            color: '#92400E', bg: '#FEF3C7', icon: 'attach_file'      },
   copiloto:   { label: 'Copiloto IA',      color: '#BE185D', bg: '#FCE7F3', icon: 'auto_awesome'     },
+  formulario: { label: 'Formulário',       color: '#0F766E', bg: '#CCFBF1', icon: 'assignment_turned_in' },
 }
 
 type ModalTipo = null | 'prontuario' | 'evolucao' | 'prescricao' | 'laudo' | 'atestado' | 'anexo' | 'copiloto' | 'plano' | 'restringir'
@@ -186,6 +187,7 @@ export function ProntuarioClient({
   const filtrosTabs: { key: FiltroTimeline; label: string }[] = [
     { key: 'todos',      label: 'Todos'       },
     { key: 'evolucao',   label: 'Evoluções'   },
+    { key: 'formulario', label: 'Formulários' },
     { key: 'prescricao', label: 'Prescrições' },
     { key: 'laudo',      label: 'Laudos'      },
     { key: 'atestado',   label: 'Atestados'   },
@@ -941,6 +943,48 @@ function DetalheRegistro({ reg, empresaPDF, pacientePDF, profissionais }: {
             }`}>{sl[String(d.status)] ?? String(d.status)}</span>
           )}
         </div>
+      </div>
+    )
+  }
+
+  if (reg.tipo === 'formulario') {
+    type CampoItem = { id: string; tipo: string; label: string; obrigatorio?: boolean }
+    const campos   = (d.campos   as CampoItem[]        ) ?? []
+    const respostas = (d.respostas as Record<string, unknown>) ?? {}
+
+    function fmtValor(tipo: string, val: unknown): string {
+      if (val === null || val === undefined || val === '') return '—'
+      if (tipo === 'selecao_multipla' && Array.isArray(val)) return val.join(', ') || '—'
+      if (tipo === 'escala_numerica') return String(val)
+      if (tipo === 'assinatura')      return val === 'assinado' ? 'Assinado ✓' : '—'
+      if (tipo === 'data')            return val ? new Date(String(val)).toLocaleDateString('pt-BR') : '—'
+      return String(val)
+    }
+
+    const camposRespondidos = campos.filter(c =>
+      c.tipo !== 'secao' && c.tipo !== 'instrucao' && c.tipo !== 'mapa_dor'
+    )
+
+    return (
+      <div className="mt-3 space-y-3">
+        {camposRespondidos.map(campo => {
+          const val = respostas[campo.id]
+          const vazio = val === null || val === undefined || val === '' || (Array.isArray(val) && val.length === 0)
+          return (
+            <div key={campo.id} className="flex flex-col gap-0.5">
+              <p className="text-xs font-semibold text-[#64748B] leading-snug">
+                {campo.label}
+                {campo.obrigatorio && <span className="text-red-400 ml-0.5">*</span>}
+              </p>
+              <p className={`text-sm leading-relaxed ${vazio ? 'text-[#CBD5E1] italic' : 'text-[#1E293B]'}`}>
+                {vazio ? 'Não respondido' : fmtValor(campo.tipo, val)}
+              </p>
+            </div>
+          )
+        })}
+        {camposRespondidos.length === 0 && (
+          <p className="text-sm text-[#94A3B8] italic">Nenhum campo com resposta registrada.</p>
+        )}
       </div>
     )
   }

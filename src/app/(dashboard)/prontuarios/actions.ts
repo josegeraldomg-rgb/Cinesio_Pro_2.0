@@ -54,7 +54,7 @@ export interface ProntuarioDetalhe {
 
 // Tipos de registro na timeline — todos persistidos em evolucoes_clinicas
 // com prefixo no campo `conteudo`: "PRESCRICAO:{...json}", "LAUDO:{...json}", etc.
-export type TipoRegistro = 'evolucao' | 'plano' | 'prescricao' | 'laudo' | 'atestado' | 'anexo' | 'copiloto'
+export type TipoRegistro = 'evolucao' | 'plano' | 'prescricao' | 'laudo' | 'atestado' | 'anexo' | 'copiloto' | 'formulario'
 
 export interface RegistroTimeline {
   id:                string
@@ -67,7 +67,7 @@ export interface RegistroTimeline {
 
 // ─── Parser interno de conteúdo ───────────────────────────────────────────────
 
-const DOC_PREFIXES: TipoRegistro[] = ['prescricao', 'laudo', 'atestado', 'anexo', 'copiloto']
+const DOC_PREFIXES: TipoRegistro[] = ['prescricao', 'laudo', 'atestado', 'anexo', 'copiloto', 'formulario']
 
 function parseConteudo(conteudo: string): { tipo: TipoRegistro; dados: Record<string, unknown>; resumo: string } {
   for (const tipo of DOC_PREFIXES) {
@@ -81,6 +81,7 @@ function parseConteudo(conteudo: string): { tipo: TipoRegistro; dados: Record<st
         if (tipo === 'atestado')   resumo = `Atestado${dados.dias ? ` — ${dados.dias} dia(s)` : ''}`
         if (tipo === 'anexo')      resumo = String(dados.nome ?? 'Arquivo anexado')
         if (tipo === 'copiloto')   resumo = String(dados.queixa ?? 'Registro por IA').slice(0, 100)
+        if (tipo === 'formulario') resumo = String(dados.nome_formulario ?? 'Formulário respondido')
         return { tipo, dados, resumo }
       } catch {
         return { tipo: 'evolucao', dados: { conteudo }, resumo: conteudo.slice(0, 120) }

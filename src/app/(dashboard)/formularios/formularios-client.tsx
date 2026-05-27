@@ -376,11 +376,10 @@ export function FormulariosClient({ formularios, envios }: Props) {
           formularioId={modalEnviar.id}
           formularioNome={modalEnviar.nome}
           formularioCat={modalEnviar.categoria}
-          onClose={() => setModalEnviar(null)}
-          onSuccess={() => {
-            // Recarrega envios na aba após envio bem-sucedido
-            setAba('envios')
-            setTimeout(() => window.location.reload(), 1800)
+          onSuccess={() => setAba('envios')}
+          onClose={() => {
+            setModalEnviar(null)
+            router.refresh()
           }}
         />
       )}

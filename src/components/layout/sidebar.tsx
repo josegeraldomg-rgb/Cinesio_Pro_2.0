@@ -23,41 +23,47 @@ type NavItem = {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard',            label: 'Painel',             icon: 'dashboard' },
-  { href: '/agenda',               label: 'Agenda',             icon: 'calendar_month' },
-  { href: '/pacientes',            label: 'Pacientes',          icon: 'groups' },
-  { href: '/prontuarios',          label: 'Prontuários',        icon: 'clinical_notes' },
-  { href: '/formularios',          label: 'Formulários',        icon: 'edit_document' },
-  { href: '/turmas',               label: 'Turmas',             icon: 'sports_gymnastics' },
-  { href: '/biblioteca-exercicios',label: 'Biblioteca',         icon: 'fitness_center' },
-  { href: '/equipe',               label: 'Equipe',             icon: 'badge' },
-  { href: '/financeiro',           label: 'Financeiro',         icon: 'payments' },
-  { href: '/relatorios',           label: 'Relatórios',         icon: 'description' },
-  { href: '/whatsapp',             label: 'WhatsApp',           icon: 'whatsapp', customIcon: <WhatsAppSvg /> },
-  { href: '/portal',               label: 'Portal do Paciente', icon: 'favorite' },
-  { href: '/configuracoes',        label: 'Configurações',      icon: 'settings' },
+  { href: '/dashboard',             label: 'Painel',             icon: 'dashboard' },
+  { href: '/agenda',                label: 'Agenda',             icon: 'calendar_month' },
+  { href: '/pacientes',             label: 'Pacientes',          icon: 'groups' },
+  { href: '/prontuarios',           label: 'Prontuários',        icon: 'clinical_notes' },
+  { href: '/formularios',           label: 'Formulários',        icon: 'edit_document' },
+  { href: '/turmas',                label: 'Turmas',             icon: 'sports_gymnastics' },
+  { href: '/biblioteca-exercicios', label: 'Biblioteca',         icon: 'fitness_center' },
+  { href: '/equipe',                label: 'Equipe',             icon: 'badge' },
+  { href: '/financeiro',            label: 'Financeiro',         icon: 'payments' },
+  { href: '/relatorios',            label: 'Relatórios',         icon: 'description' },
+  { href: '/whatsapp',              label: 'WhatsApp',           icon: 'whatsapp', customIcon: <WhatsAppSvg /> },
+  { href: '/portal',                label: 'Portal do Paciente', icon: 'favorite' },
+  { href: '/configuracoes',         label: 'Configurações',      icon: 'settings' },
 ]
 
-const PAGE_BG  = '#EDEFF3'
-const SIDEBAR  = '#5b5fcf'
-const CORNER   = 20
+const PAGE_BG = '#EDEFF3'
+const SIDEBAR = '#5b5fcf'
+const CORNER  = 20
 
 function getInitial(name: string) {
   return (name || 'U').charAt(0).toUpperCase()
 }
 
 interface SidebarProps {
-  userName?:    string
-  userEmail?:   string
-  empresaNome?: string
-  collapsed?:   boolean
+  userName?:      string
+  userEmail?:     string
+  empresaNome?:   string
+  expanded?:      boolean
+  pinned?:        boolean
+  onHoverChange?: (v: boolean) => void
+  onPinToggle?:   () => void
 }
 
 export function Sidebar({
   userName    = 'Usuário',
   userEmail   = '',
   empresaNome = 'CinesioPro',
-  collapsed   = false,
+  expanded    = false,
+  pinned      = false,
+  onHoverChange,
+  onPinToggle,
 }: SidebarProps) {
   const pathname = usePathname()
   const router   = useRouter()
@@ -79,7 +85,7 @@ export function Sidebar({
     router.refresh()
   }
 
-  const W = collapsed ? 72 : 260
+  const W = expanded ? 260 : 72
 
   // ── Ícone compartilhado ─────────────────────────────────────────────────────
   function NavIcon({ item, active }: { item: NavItem; active: boolean }) {
@@ -110,18 +116,56 @@ export function Sidebar({
     <aside
       className="fixed left-4 top-4 bottom-4 z-50 flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out"
       style={{
-        width: W,
+        width:     W,
         borderRadius: 24,
-        background: SIDEBAR,
-        boxShadow: '0 8px 32px rgba(91,95,207,0.25)',
+        background:   SIDEBAR,
+        boxShadow:    '0 8px 32px rgba(91,95,207,0.25)',
+        // Quando não fixada, sobrepõe o conteúdo (z mais alto)
+        zIndex: pinned ? 50 : 55,
+      }}
+      onMouseEnter={() => onHoverChange?.(true)}
+      onMouseLeave={() => {
+        onHoverChange?.(false)
+        hideTooltip()
       }}
     >
+      {/* ── Botão Pin — aparece ao expandir ─────────────────────────────────── */}
+      <button
+        onClick={onPinToggle}
+        title={pinned ? 'Desafixar menu' : 'Fixar menu'}
+        className="absolute flex items-center justify-center transition-all duration-200"
+        style={{
+          top:          12,
+          right:        12,
+          width:        26,
+          height:       26,
+          borderRadius: '50%',
+          background:   pinned ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)',
+          color:        '#ffffff',
+          opacity:      expanded ? 1 : 0,
+          pointerEvents: expanded ? 'auto' : 'none',
+          zIndex:        10,
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.3)' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = pinned ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)' }}
+      >
+        <span
+          className="material-symbols-outlined transition-transform duration-300"
+          style={{
+            fontSize:  15,
+            transform: pinned ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
+        >
+          chevron_right
+        </span>
+      </button>
+
       {/* ── Bloco de Perfil ─────────────────────────────────────────────────── */}
       <div
         className="flex flex-col items-center border-b border-white/10 flex-shrink-0 transition-all duration-300 overflow-hidden"
         style={{
-          paddingTop:    collapsed ? 8  : 20,
-          paddingBottom: collapsed ? 10 : 20,
+          paddingTop:    expanded ? 20 : 8,
+          paddingBottom: expanded ? 20 : 10,
           paddingLeft:   16,
           paddingRight:  16,
         }}
@@ -130,23 +174,23 @@ export function Sidebar({
         <div
           className="flex items-center justify-center text-white font-bold select-none transition-all duration-300 flex-shrink-0"
           style={{
-            width:        collapsed ? 40 : 80,
-            height:       collapsed ? 40 : 80,
+            width:        expanded ? 80 : 40,
+            height:       expanded ? 80 : 40,
             borderRadius: '50%',
-            fontSize:     collapsed ? 15 : 24,
+            fontSize:     expanded ? 24 : 15,
             background:   'rgba(255,255,255,0.15)',
-            boxShadow:    collapsed
-              ? '0 0 0 2px rgba(255,255,255,0.35)'
-              : '0 0 0 2px rgba(255,255,255,0.4), 0 0 0 6px rgba(91,95,207,0.6)',
+            boxShadow:    expanded
+              ? '0 0 0 2px rgba(255,255,255,0.4), 0 0 0 6px rgba(91,95,207,0.6)'
+              : '0 0 0 2px rgba(255,255,255,0.35)',
           }}
         >
           {getInitial(userName)}
         </div>
 
-        {/* Nome e email — ocultados quando colapsado */}
+        {/* Nome e email — visíveis quando expandido */}
         <div
           className="overflow-hidden transition-all duration-300 flex flex-col items-center w-full"
-          style={{ maxHeight: collapsed ? 0 : 60, opacity: collapsed ? 0 : 1 }}
+          style={{ maxHeight: expanded ? 60 : 0, opacity: expanded ? 1 : 0 }}
         >
           <p
             className="mt-4 text-white font-bold truncate max-w-full text-center"
@@ -166,7 +210,7 @@ export function Sidebar({
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
           // ── Modo EXPANDIDO ──────────────────────────────────────────────────
-          if (!collapsed) {
+          if (expanded) {
             if (isActive) {
               return (
                 <div
@@ -247,11 +291,11 @@ export function Sidebar({
                 href={item.href}
                 className="flex items-center justify-center transition-all select-none"
                 style={{
-                  width: 48,
-                  height: 44,
+                  width:        48,
+                  height:       44,
                   borderRadius: 12,
-                  background: isActive ? PAGE_BG : 'transparent',
-                  color:      isActive ? SIDEBAR : 'rgba(255,255,255,0.85)',
+                  background:   isActive ? PAGE_BG   : 'transparent',
+                  color:        isActive ? SIDEBAR    : 'rgba(255,255,255,0.85)',
                 }}
                 onMouseEnter={e => {
                   showTooltip(item.label, e.currentTarget)
@@ -278,10 +322,18 @@ export function Sidebar({
       {/* ── Sair ─────────────────────────────────────────────────────────────── */}
       <div
         className="border-t border-white/10 flex-shrink-0 transition-all duration-300"
-        style={{ padding: collapsed ? '10px 0' : '10px 16px' }}
+        style={{ padding: expanded ? '10px 16px' : '10px 0' }}
       >
-        {collapsed ? (
-          /* Colapsado: só o ícone centralizado — tooltip via portal */
+        {expanded ? (
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 w-full px-4 py-2 rounded-full transition-all text-white/85 hover:text-white hover:bg-white/10"
+            style={{ fontSize: 13, fontWeight: 600 }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
+            Sair
+          </button>
+        ) : (
           <div className="flex justify-center">
             <button
               onClick={handleLogout}
@@ -299,22 +351,13 @@ export function Sidebar({
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
             </button>
           </div>
-        ) : (
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-4 py-2 rounded-full transition-all text-white/85 hover:text-white hover:bg-white/10"
-            style={{ fontSize: 13, fontWeight: 600 }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
-            Sair
-          </button>
         )}
       </div>
 
-      {/* ── Equipe Ativa — oculta quando colapsado ──────────────────────────── */}
+      {/* ── Equipe Ativa — visível apenas quando expandido ───────────────────── */}
       <div
         className="overflow-hidden transition-all duration-300 flex-shrink-0"
-        style={{ maxHeight: collapsed ? 0 : 120, opacity: collapsed ? 0 : 1 }}
+        style={{ maxHeight: expanded ? 120 : 0, opacity: expanded ? 1 : 0 }}
       >
         <div className="px-4 pb-5">
           <p
@@ -359,31 +402,27 @@ export function Sidebar({
       </div>
     </aside>
 
-    {/* ── Tooltip portal ─────────────────────────────────────────────────────── */}
-    {collapsed && tooltip && typeof document !== 'undefined' && createPortal(
+    {/* ── Tooltip portal (só quando colapsado) ───────────────────────────────── */}
+    {!expanded && tooltip && typeof document !== 'undefined' && createPortal(
       <div
         className="pointer-events-none"
         style={{
           position:   'fixed',
-          left:       16 + 72 + 10,   // sidebar left(16) + collapsed width(72) + gap(10)
+          left:       16 + 72 + 10,
           top:        tooltip.y,
           transform:  'translateY(-50%)',
           zIndex:     9999,
           display:    'flex',
           alignItems: 'center',
-          gap:        0,
         }}
       >
-        {/* Seta */}
         <div style={{
-          width:       0,
-          height:      0,
-          borderTop:   '5px solid transparent',
-          borderBottom:'5px solid transparent',
-          borderRight: '6px solid #1E293B',
-          flexShrink:  0,
+          width: 0, height: 0,
+          borderTop:    '5px solid transparent',
+          borderBottom: '5px solid transparent',
+          borderRight:  '6px solid #1E293B',
+          flexShrink: 0,
         }} />
-        {/* Label */}
         <div style={{
           background:   '#1E293B',
           color:        '#F8FAFC',
@@ -403,4 +442,3 @@ export function Sidebar({
   </>
   )
 }
-

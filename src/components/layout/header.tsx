@@ -1,7 +1,7 @@
 'use client'
 
 import { Search, Bell, MessageSquare, Settings } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 
@@ -10,11 +10,13 @@ const PAGE_META: Record<string, { title: string; description: string }> = {
   '/dashboard':     { title: 'Painel',             description: 'Visão geral da clínica em tempo real' },
   '/agenda':        { title: 'Agenda',             description: 'Gerencie consultas, sessões e turmas' },
   '/pacientes':     { title: 'Pacientes',          description: 'Cadastro, evolução clínica e histórico' },
+  '/prontuarios':   { title: 'Prontuários',        description: 'Ficha clínica completa do paciente' },
   '/turmas':        { title: 'Turmas',             description: 'Aulas em grupo, alunos e presenças' },
   '/equipe':        { title: 'Equipe',             description: 'Colaboradores, serviços e horários de trabalho' },
   '/financeiro':    { title: 'Financeiro',         description: 'Receitas, despesas, comissões e inadimplência' },
   '/relatorios':    { title: 'Relatórios',         description: 'Documentos clínicos e relatórios com IA' },
   '/whatsapp':      { title: 'WhatsApp',           description: 'Mensagens, lembretes e atendimento' },
+  '/formularios':   { title: 'Formulários',        description: 'Crie e envie formulários aos pacientes' },
   '/portal':        { title: 'Portal do Paciente', description: 'Experiência do paciente: progresso e agendamentos' },
   '/configuracoes': { title: 'Configurações',      description: 'Empresa, equipe, serviços e integrações' },
 }
@@ -29,7 +31,22 @@ function getPageMeta(pathname: string) {
 export function Header() {
   const [search, setSearch] = useState('')
   const pathname = usePathname()
-  const { title, description } = getPageMeta(pathname)
+
+  // Título dinâmico: páginas como prontuário individual enviam o nome via evento
+  const [dynamicMeta, setDynamicMeta] = useState<{ title: string; description: string } | null>(null)
+  useEffect(() => {
+    function handler(e: Event) {
+      const { title, description } = (e as CustomEvent<{ title: string; description: string }>).detail
+      setDynamicMeta(title ? { title, description } : null)
+    }
+    window.addEventListener('page-title-change', handler)
+    return () => window.removeEventListener('page-title-change', handler)
+  }, [])
+
+  // Limpa o título dinâmico ao navegar para outra rota
+  useEffect(() => { setDynamicMeta(null) }, [pathname])
+
+  const { title, description } = dynamicMeta ?? getPageMeta(pathname)
 
   return (
     <header

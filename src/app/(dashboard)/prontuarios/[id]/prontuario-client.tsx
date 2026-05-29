@@ -124,6 +124,19 @@ export function ProntuarioClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Injeta o nome do paciente no header do dashboard
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('page-title-change', {
+      detail: { title: paciente.nome, description: 'Prontuário' },
+    }))
+    return () => {
+      window.dispatchEvent(new CustomEvent('page-title-change', {
+        detail: { title: '', description: '' },
+      }))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paciente.nome])
+
   // Dados para PDF
   const empresaPDF: EmpresaPDF = {
     nome: empresa.nome, telefone: empresa.telefone, email: empresa.email, cnpj: empresa.cnpj,
@@ -196,28 +209,20 @@ export function ProntuarioClient({
   ]
 
   return (
-    <div className="min-h-screen" style={{ background: '#EDEFF3' }}>
-      <div className="max-w-3xl mx-auto px-4 py-8">
+    <>
+    <div className="max-w-5xl mx-auto space-y-3">
 
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-6 text-sm">
-          <button onClick={() => router.push('/prontuarios')}
-            className="text-[#64748B] hover:text-[#1E293B] transition-colors">Prontuários</button>
-          <span className="text-[#CBD5E1]">/</span>
-          <span className="text-[#1E293B] font-medium truncate">{paciente.nome}</span>
-        </div>
-
-        {/* ── Header do Paciente ── */}
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden mb-4">
+        {/* ── Header do Paciente — linha compacta ── */}
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
 
           {/* Faixa de status de restrição */}
           {lockInfo && (
-            <div className="px-5 py-2 flex items-center gap-2 text-xs font-bold"
+            <div className="px-5 py-1.5 flex items-center gap-2 text-xs font-bold"
               style={{
                 background: desbloqueado ? '#DCFCE7' : '#FEF9C3',
                 color:      desbloqueado ? '#15803D' : '#92400E',
               }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>
                 {desbloqueado ? 'lock_open' : 'lock'}
               </span>
               {desbloqueado
@@ -226,10 +231,12 @@ export function ProntuarioClient({
             </div>
           )}
 
-          {/* Linha superior: Avatar + Nome + Botões */}
-          <div className="px-6 pt-5 pb-4 flex items-start gap-4">
+          {/* Linha única: Avatar · Nome · Info · Botões */}
+          <div className="px-5 py-3 flex items-center gap-3">
+
+            {/* Avatar */}
             <div
-              className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-white text-xl flex-shrink-0 overflow-hidden"
+              className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0 overflow-hidden"
               style={{ background: '#3B82F6' }}
             >
               {paciente.foto_url
@@ -237,24 +244,56 @@ export function ProntuarioClient({
                 : iniciais(paciente.nome)}
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                <h1 className="text-xl font-black text-[#1E293B]">{paciente.nome}</h1>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  paciente.status === 'ativo'    ? 'bg-green-100 text-green-700'  :
-                  paciente.status === 'inativo'  ? 'bg-orange-100 text-orange-600' :
+            {/* Nome + status + ID */}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-black text-[#1E293B] truncate">{paciente.nome}</h1>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${
+                  paciente.status === 'ativo'   ? 'bg-green-100 text-green-700'   :
+                  paciente.status === 'inativo' ? 'bg-orange-100 text-orange-600' :
                   'bg-blue-100 text-blue-700'
                 }`}>
                   {paciente.status === 'ativo' ? 'Ativo' : paciente.status === 'inativo' ? 'Inativo' : 'Alta'}
                 </span>
               </div>
-              <p className="text-[11px] text-[#94A3B8] font-mono">
+              <p className="text-[10px] text-[#94A3B8] font-mono leading-none mt-0.5">
                 #{prontuario.id.slice(-8).toUpperCase()}
               </p>
             </div>
 
-            {/* Botões do header */}
-            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+            {/* Divisor */}
+            <div className="w-px h-8 bg-[#E2E8F0] flex-shrink-0 mx-1" />
+
+            {/* Chips de info clínica */}
+            <div className="flex items-center gap-5 flex-1 min-w-0 overflow-hidden">
+              {/* Nascimento / Idade */}
+              <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0">
+                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#94A3B8' }}>cake</span>
+                <span className="text-xs text-[#475569] whitespace-nowrap">
+                  {paciente.data_nascimento
+                    ? `${calcularIdade(paciente.data_nascimento)} · ${formatarData(paciente.data_nascimento)}`
+                    : '—'}
+                </span>
+              </div>
+              {/* Telefone */}
+              {paciente.telefone && (
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#94A3B8' }}>call</span>
+                  <span className="text-xs text-[#475569] whitespace-nowrap">{formatarTel(paciente.telefone)}</span>
+                </div>
+              )}
+              {/* Convênio */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#94A3B8' }}>health_and_safety</span>
+                <span className="text-xs text-[#475569] whitespace-nowrap">{paciente.convenio || 'Particular'}</span>
+              </div>
+            </div>
+
+            {/* Divisor */}
+            <div className="w-px h-8 bg-[#E2E8F0] flex-shrink-0 mx-1" />
+
+            {/* Botões de ação */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
                 onClick={() => abrirModal('restringir')}
                 title={lockInfo ? 'Gerenciar restrição de acesso' : 'Restringir acesso com senha'}
@@ -263,52 +302,28 @@ export function ProntuarioClient({
                   ? { background: '#FEF9C3', borderColor: '#FDE047', color: '#92400E' }
                   : { background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>
                   {lockInfo ? 'lock' : 'lock_open'}
                 </span>
                 {lockInfo ? 'Restrito' : 'Restringir'}
               </button>
               <button onClick={() => abrirModal('prontuario')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border bg-[#F8FAFC] border-[#E2E8F0] text-[#64748B] hover:border-[#CBD5E1] transition-all">
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
                 Dados
               </button>
               <button onClick={handleExportarProntuario}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border bg-[#F8FAFC] border-[#E2E8F0] text-[#64748B] hover:border-[#CBD5E1] transition-all"
                 title="Exportar prontuário completo em PDF">
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>picture_as_pdf</span>
                 PDF
               </button>
             </div>
           </div>
 
-          {/* Grade de dados básicos do paciente */}
-          <div className="mx-6 mb-4 rounded-xl border border-[#F1F5F9] overflow-hidden bg-[#F8FAFC]">
-            <div className="grid grid-cols-2 divide-x divide-[#F1F5F9]">
-              <div className="divide-y divide-[#F1F5F9]">
-                <InfoRow icon="cake"
-                  label="Nascimento"
-                  value={paciente.data_nascimento
-                    ? `${formatarData(paciente.data_nascimento)} · ${calcularIdade(paciente.data_nascimento)}`
-                    : '—'}
-                />
-                <InfoRow icon="call"   label="Telefone" value={formatarTel(paciente.telefone) || '—'} />
-                {paciente.convenio
-                  ? <InfoRow icon="health_and_safety" label="Convênio" value={paciente.convenio} />
-                  : <InfoRow icon="health_and_safety" label="Convênio" value="Particular" />
-                }
-              </div>
-              <div className="divide-y divide-[#F1F5F9]">
-                <InfoRow icon="badge"  label="CPF"    value={paciente.cpf ?? '—'} />
-                <InfoRow icon="mail"   label="E-mail" value={paciente.email ?? '—'} />
-                <InfoRow icon="tag"    label="Nº Convênio" value={paciente.numero_convenio ?? '—'} />
-              </div>
-            </div>
-          </div>
-
-          {/* Chips de alertas clínicos */}
+          {/* Chips de alertas clínicos (apenas quando houver dados) */}
           {(prontuario.alergias || prontuario.medicamentos || prontuario.antecedentes) && (
-            <div className="px-6 pb-4 flex flex-wrap gap-2">
+            <div className="px-5 pb-3 pt-0 flex flex-wrap gap-2 border-t border-[#F8FAFC]">
               {prontuario.alergias && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
                   style={{ background: '#FEF2F2', color: '#EF4444', border: '1px solid #FECACA' }}>
@@ -324,7 +339,7 @@ export function ProntuarioClient({
                   <span className="material-symbols-outlined" style={{ fontSize: 13 }}>medication</span>
                   <span className="uppercase text-[10px] tracking-wide opacity-70">Medicamentos</span>
                   <span>·</span>
-                  <span className="truncate max-w-[180px]">{prontuario.medicamentos}</span>
+                  <span className="truncate max-w-[200px]">{prontuario.medicamentos}</span>
                 </div>
               )}
               {prontuario.antecedentes && (
@@ -333,7 +348,7 @@ export function ProntuarioClient({
                   <span className="material-symbols-outlined" style={{ fontSize: 13 }}>history</span>
                   <span className="uppercase text-[10px] tracking-wide opacity-70">Antecedentes</span>
                   <span>·</span>
-                  <span className="truncate max-w-[180px]">{prontuario.antecedentes}</span>
+                  <span className="truncate max-w-[200px]">{prontuario.antecedentes}</span>
                 </div>
               )}
             </div>
@@ -520,7 +535,7 @@ export function ProntuarioClient({
           }}
           salvando={salvando} erro={erro} />
       )}
-    </div>
+    </>
   )
 }
 

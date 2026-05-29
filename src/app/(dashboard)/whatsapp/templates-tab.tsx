@@ -28,6 +28,7 @@ const GATILHOS: GatilhoDef[] = [
   { id: 'pedido_confirmacao',        label: 'Pedido de Confirmação',       sublabelDefault: '1440 min antes', emoji: '✅', tipo: 'minutos_antes', minutosDefault: 1440 },
   { id: 'aniversario_paciente',      label: 'Aniversário do Paciente',     sublabelDefault: 'Às 09:00h',      emoji: '🎂', tipo: 'horario_fixo', horarioDefault: '09:00' },
   { id: 'agenda_diaria',             label: 'Agenda Diária',               sublabelDefault: 'Às 21:00h',      emoji: '📊', tipo: 'horario_fixo', horarioDefault: '21:00' },
+  { id: 'envio_formulario',          label: 'Envio de Formulário',         sublabelDefault: 'Imediato',        emoji: '📋', tipo: 'imediato' },
 ]
 
 // ─── Mensagens padrão de fábrica ─────────────────────────────────────────────
@@ -83,6 +84,15 @@ Você é muito especial para nós. Conte sempre com nosso carinho e cuidado! �
 Olá, equipe da *[[empresa_nome]]*!
 
 Seguem os atendimentos programados para hoje. Bom trabalho a todos! 💪`,
+
+  envio_formulario:
+`Olá, [[cliente_nome]]! 👋
+
+Por favor, preencha o formulário *[[formulario_nome]]* antes da sua próxima consulta:
+
+🔗 [[link_formulario]]
+
+Qualquer dúvida, estamos à disposição! 😊`,
 }
 
 // ─── Tags dinâmicas disponíveis ───────────────────────────────────────────────
@@ -95,6 +105,8 @@ const TAGS: TagDef[] = [
   { id: 'hora_agendamento',  label: '[[hora_agendamento]]',  icon: '⏰', sample: '14:30' },
   { id: 'servico_nome',      label: '[[servico_nome]]',      icon: '✂️', sample: 'Pilates Terapêutico' },
   { id: 'valor_agendamento', label: '[[valor_agendamento]]', icon: '💰', sample: 'R$ 150,00' },
+  { id: 'formulario_nome',   label: '[[formulario_nome]]',   icon: '📄', sample: 'Anamnese Fisioterapêutica' },
+  { id: 'link_formulario',   label: '[[link_formulario]]',   icon: '🔗', sample: 'https://clinica.com/responder/abc123' },
 ]
 
 // ─── Renderização do preview ──────────────────────────────────────────────────

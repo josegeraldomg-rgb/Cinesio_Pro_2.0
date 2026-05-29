@@ -9,6 +9,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { CATEGORIAS } from '@/lib/formularios/tipos'
 import { enviarTextWaAction } from '@/app/(dashboard)/whatsapp/actions'
+import { obterMensagemTemplateAction } from '@/app/(dashboard)/whatsapp/templates-actions'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Paciente { id: string; nome: string; ddi: string | null; telefone: string | null; email: string | null }
@@ -300,10 +301,27 @@ export function ModalEnviarFormulario({
   async function abrirWhatsApp() {
     const fone = fmtFone(pDdi, pTel)
     if (!fone) return
-    const msg = `Olá, ${pNome}! 👋\n\nPor favor, preencha o formulário *${fNome}* antes da sua próxima consulta:\n\n🔗 ${linkGerado}\n\nQualquer dúvida, estamos à disposição!`
+
+    // Mensagem padrão usada como fallback caso não haja template salvo
+    const msgFallback = `Olá, ${pNome}! 👋\n\nPor favor, preencha o formulário *${fNome}* antes da sua próxima consulta:\n\n🔗 ${linkGerado}\n\nQualquer dúvida, estamos à disposição!`
 
     setWaSending(true)
     setWaErro(null)
+
+    // Tenta buscar o template configurado na tela /whatsapp → Templates
+    const tplResult = await obterMensagemTemplateAction(
+      'envio_formulario',
+      {
+        cliente_nome:    pNome,
+        formulario_nome: fNome,
+        link_formulario: linkGerado,
+      },
+      // Fallback inline (usado se não houver template salvo no banco)
+      `Olá, [[cliente_nome]]! 👋\n\nPor favor, preencha o formulário *[[formulario_nome]]* antes da sua próxima consulta:\n\n🔗 [[link_formulario]]\n\nQualquer dúvida, estamos à disposição! 😊`,
+    )
+
+    const msg = 'mensagem' in tplResult ? tplResult.mensagem : msgFallback
+
     const result = await enviarTextWaAction(fone, msg)
     setWaSending(false)
 

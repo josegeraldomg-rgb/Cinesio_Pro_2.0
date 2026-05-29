@@ -25,6 +25,8 @@ const AMOSTRAS: Record<string, string> = {
   hora_agendamento:  '14:30',
   servico_nome:      'Pilates Terapêutico',
   valor_agendamento: 'R$ 150,00',
+  formulario_nome:   'Anamnese Fisioterapêutica',
+  link_formulario:   'https://clinica.com/responder/abc123',
 }
 
 function renderMensagem(mensagem: string): string {
@@ -110,6 +112,43 @@ export async function salvarTemplateAction(
     return { success: true }
   } catch (e: any) {
     return { error: e.message ?? 'Erro ao salvar template' }
+  }
+}
+
+/**
+ * Obtém a mensagem de um template, substituindo as tags pelos valores reais
+ * fornecidos em `vars`. Usa o template salvo no banco; se não existir, usa
+ * a mensagem padrão de fábrica definida no frontend (passada como `fallback`).
+ */
+export async function obterMensagemTemplateAction(
+  gatilho: string,
+  vars: Record<string, string>,
+  fallback?: string,
+): Promise<{ mensagem: string } | { error: string }> {
+  try {
+    const { empresaId } = await getEmpresaId()
+    const admin = createAdminClient()
+    const { data } = await admin
+      .from('whatsapp_templates')
+      .select('mensagem, ativo')
+      .eq('empresa_id', empresaId)
+      .eq('gatilho', gatilho)
+      .maybeSingle()
+
+    // Usa o template do banco se existir e estiver ativo; caso contrário usa fallback
+    const template = (data?.ativo !== false && data?.mensagem) ? data.mensagem : (fallback ?? '')
+
+    if (!template) return { error: 'Template não encontrado.' }
+
+    // Substitui todas as tags pelos valores reais
+    const mensagem = Object.entries(vars).reduce(
+      (acc, [key, val]) => acc.split(`[[${key}]]`).join(val),
+      template,
+    )
+
+    return { mensagem }
+  } catch (e: any) {
+    return { error: e.message ?? 'Erro ao obter template' }
   }
 }
 

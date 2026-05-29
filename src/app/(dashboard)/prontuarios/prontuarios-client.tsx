@@ -28,15 +28,7 @@ export function ProntuariosClient({ pacientes }: { pacientes: PacienteResumo[] }
 
   return (
     <div className="min-h-screen" style={{ background: '#EDEFF3' }}>
-      <div className="max-w-3xl mx-auto px-4 py-8">
-
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-[#1E293B] mb-1">Prontuários Clínicos</h1>
-          <p className="text-sm text-[#64748B]">
-            Prontuário eletrônico unificado: um registro único por paciente com histórico completo.
-          </p>
-        </div>
+      <div className="max-w-3xl mx-auto px-4 py-4">
 
         {/* Busca */}
         <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm px-4 py-3 mb-5 flex items-center gap-3">

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { renderOrientacao } from '@/lib/orientacoes-utils'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -31,26 +32,6 @@ async function getContext() {
 
   if (!me) return { error: 'Usuário não encontrado.' as const }
   return { admin, empresa_id: me.empresa_id as string }
-}
-
-// ─── Tags dinâmicas disponíveis nas mensagens ─────────────────────────────────
-
-export const ORIENTACAO_TAGS: { tag: string; label: string; exemplo: string }[] = [
-  { tag: '[[cliente_nome]]',    label: 'Nome do paciente',   exemplo: 'Maria Silva'              },
-  { tag: '[[servico_nome]]',    label: 'Nome do serviço',    exemplo: 'Avaliação Física'          },
-  { tag: '[[profissional_nome]]', label: 'Profissional',     exemplo: 'Dr. João Oliveira'         },
-  { tag: '[[data_agendamento]]', label: 'Data',              exemplo: '28/05/2026'               },
-  { tag: '[[hora_agendamento]]', label: 'Horário',           exemplo: '14:30'                    },
-]
-
-export function renderOrientacao(
-  mensagem: string,
-  vars: Record<string, string>,
-): string {
-  return Object.entries(vars).reduce(
-    (acc, [key, val]) => acc.split(`[[${key}]]`).join(val),
-    mensagem,
-  )
 }
 
 // ─── Listar orientações da empresa ────────────────────────────────────────────

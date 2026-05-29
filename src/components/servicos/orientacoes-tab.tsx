@@ -5,9 +5,9 @@ import {
   listarOrientacoesAction,
   salvarOrientacaoAction,
   excluirOrientacaoAction,
-  ORIENTACAO_TAGS,
   type OrientacaoServico,
 } from '@/app/(dashboard)/servicos/orientacoes-actions'
+import { ORIENTACAO_TAGS } from '@/lib/orientacoes-utils'
 import type { Servico, Profissional, Vinculo } from '@/app/(dashboard)/servicos/servicos-client'
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────

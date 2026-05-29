@@ -63,8 +63,8 @@ export function ProntuariosClient({ pacientes }: { pacientes: PacienteResumo[] }
               <button
                 key={pac.id}
                 onClick={() => router.push(`/prontuarios/${pac.id}`)}
-                className={`w-full text-left bg-white rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${
-                  pendente ? 'border border-dashed border-orange-300' : 'border border-[#E2E8F0]'
+                className={`w-full text-left bg-white rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm transition-all cursor-pointer hover:bg-[#F8FAFC] hover:shadow-md hover:-translate-y-0.5 ${
+                  pendente ? 'border border-dashed border-orange-300' : 'border border-[#E2E8F0] hover:border-[#CBD5E1]'
                 }`}
               >
                 {/* Avatar */}

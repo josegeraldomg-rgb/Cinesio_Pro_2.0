@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useTransition } from 'react'
 import { X, Plus, Trash2, ChevronUp, ChevronDown, Pencil, Dumbbell, List } from 'lucide-react'
@@ -24,10 +24,10 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
   const [isPending, startTransition] = useTransition()
   const [erro, setErro] = useState('')
 
-  // ── Editor de sequência ──
+  // â”€â”€ Editor de sequÃªncia â”€â”€
   const [editandoSeq, setEditandoSeq] = useState<Partial<Sequencia> | null>(null)
 
-  // ── Editor de exercício ──
+  // â”€â”€ Editor de exercÃ­cio â”€â”€
   const [editandoEx, setEditandoEx] = useState<Partial<Exercicio> | null>(null)
 
   async function carregarExercicios() {
@@ -44,7 +44,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
     if (a === 'exercicios') carregarExercicios()
   }
 
-  // ── Sequências ──
+  // â”€â”€ SequÃªncias â”€â”€
 
   function novaSequencia() {
     setEditandoSeq({ nome: '', descricao: '', exercicios: [] })
@@ -55,7 +55,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
   }
 
   async function salvarSequencia() {
-    if (!editandoSeq?.nome?.trim()) { setErro('Nome obrigatório.'); return }
+    if (!editandoSeq?.nome?.trim()) { setErro('Nome obrigatÃ³rio.'); return }
     setErro('')
     startTransition(async () => {
       const res = await salvarSequenciaAction({
@@ -83,7 +83,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
   }
 
   async function excluirSequencia(id: string) {
-    if (!confirm('Excluir esta sequência?')) return
+    if (!confirm('Excluir esta sequÃªncia?')) return
     startTransition(async () => {
       const res = await excluirSequenciaAction(id)
       if ('error' in res) { setErro(res.error); return }
@@ -93,7 +93,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
     })
   }
 
-  // Exercícios dentro da sequência em edição
+  // ExercÃ­cios dentro da sequÃªncia em ediÃ§Ã£o
   function addExercicioNaSeq(ex: Exercicio) {
     setEditandoSeq(prev => ({
       ...prev,
@@ -130,10 +130,10 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
     })
   }
 
-  // ── Exercícios da biblioteca ──
+  // â”€â”€ ExercÃ­cios da biblioteca â”€â”€
 
   async function salvarExercicio() {
-    if (!editandoEx?.nome?.trim()) { setErro('Nome obrigatório.'); return }
+    if (!editandoEx?.nome?.trim()) { setErro('Nome obrigatÃ³rio.'); return }
     setErro('')
     startTransition(async () => {
       const res = await salvarExercicioAction({
@@ -151,7 +151,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
   }
 
   async function excluirExercicio(id: string) {
-    if (!confirm('Excluir este exercício?')) return
+    if (!confirm('Excluir este exercÃ­cio?')) return
     startTransition(async () => {
       const res = await excluirExercicioAction(id)
       if ('error' in res) { setErro(res.error); return }
@@ -166,11 +166,11 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[#F0F0F0]">
-          <h2 className="font-bold text-[#2C3E50] text-base">Sequências e Exercícios</h2>
+          <h2 className="font-bold text-[#2C3E50] text-base">SequÃªncias e ExercÃ­cios</h2>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-[#F0F0F0] transition-colors">
             <X size={18} className="text-[#7F8C8D]" />
           </button>
@@ -179,8 +179,8 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
         {/* Abas */}
         <div className="flex border-b border-[#F0F0F0] px-5">
           {([
-            { id: 'sequencias' as Aba, label: 'Sequências', icon: <List size={14} /> },
-            { id: 'exercicios' as Aba, label: 'Exercícios', icon: <Dumbbell size={14} /> },
+            { id: 'sequencias' as Aba, label: 'SequÃªncias', icon: <List size={14} /> },
+            { id: 'exercicios' as Aba, label: 'ExercÃ­cios', icon: <Dumbbell size={14} /> },
           ]).map(t => (
             <button
               key={t.id}
@@ -201,10 +201,10 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
           </div>
         )}
 
-        {/* Conteúdo */}
+        {/* ConteÃºdo */}
         <div className="flex-1 overflow-auto p-5">
 
-          {/* ── Aba Sequências ── */}
+          {/* â”€â”€ Aba SequÃªncias â”€â”€ */}
           {aba === 'sequencias' && !editandoSeq && (
             <div className="space-y-3">
               <div className="flex justify-end">
@@ -212,17 +212,17 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                   onClick={novaSequencia}
                   className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3829c7] transition-colors"
                 >
-                  <Plus size={14} /> Nova Sequência
+                  <Plus size={14} /> Nova SequÃªncia
                 </button>
               </div>
               {sequencias.length === 0 && (
-                <p className="text-sm text-[#7F8C8D] text-center py-8">Nenhuma sequência cadastrada.</p>
+                <p className="text-sm text-[#7F8C8D] text-center py-8">Nenhuma sequÃªncia cadastrada.</p>
               )}
               {sequencias.map(s => (
                 <div key={s.id} className="flex items-center gap-3 p-3 bg-[#F8F9FA] rounded-xl border border-[#E8E8E8]">
                   <div className="flex-1">
                     <p className="font-medium text-[#2C3E50] text-sm">{s.nome}</p>
-                    <p className="text-xs text-[#7F8C8D]">{s.exercicios.length} exercício{s.exercicios.length !== 1 ? 's' : ''}</p>
+                    <p className="text-xs text-[#7F8C8D]">{s.exercicios.length} exercÃ­cio{s.exercicios.length !== 1 ? 's' : ''}</p>
                   </div>
                   <button onClick={() => editarSequencia(s)} className="p-1.5 rounded-lg hover:bg-[#E8E8E8] transition-colors">
                     <Pencil size={14} className="text-[#7F8C8D]" />
@@ -235,15 +235,15 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
             </div>
           )}
 
-          {/* ── Editor de sequência ── */}
+          {/* â”€â”€ Editor de sequÃªncia â”€â”€ */}
           {aba === 'sequencias' && editandoSeq && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <button onClick={() => setEditandoSeq(null)} className="text-sm text-[#7F8C8D] hover:text-[#2C3E50]">
-                  ← Voltar
+                  â† Voltar
                 </button>
                 <h3 className="font-semibold text-[#2C3E50] text-sm">
-                  {editandoSeq.id ? 'Editar Sequência' : 'Nova Sequência'}
+                  {editandoSeq.id ? 'Editar SequÃªncia' : 'Nova SequÃªncia'}
                 </h3>
               </div>
 
@@ -258,7 +258,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-[#7F8C8D] mb-1 block">Descrição</label>
+                  <label className="text-xs text-[#7F8C8D] mb-1 block">DescriÃ§Ã£o</label>
                   <input
                     className="w-full border border-[#E8E8E8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A3AE8]/30"
                     value={editandoSeq.descricao ?? ''}
@@ -268,11 +268,11 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                 </div>
               </div>
 
-              {/* Lista de exercícios da sequência */}
+              {/* Lista de exercÃ­cios da sequÃªncia */}
               <div>
-                <p className="text-xs font-medium text-[#7F8C8D] uppercase tracking-wide mb-2">Exercícios na Sequência</p>
+                <p className="text-xs font-medium text-[#7F8C8D] uppercase tracking-wide mb-2">ExercÃ­cios na SequÃªncia</p>
                 {(editandoSeq.exercicios ?? []).length === 0 && (
-                  <p className="text-sm text-[#7F8C8D] py-4 text-center">Adicione exercícios da biblioteca abaixo.</p>
+                  <p className="text-sm text-[#7F8C8D] py-4 text-center">Adicione exercÃ­cios da biblioteca abaixo.</p>
                 )}
                 <div className="space-y-2">
                   {(editandoSeq.exercicios ?? []).map((ex, idx) => (
@@ -294,7 +294,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                           min={1}
                           value={ex.series ?? ''}
                           onChange={e => updateExSeq(idx, { series: e.target.value ? Number(e.target.value) : null })}
-                          placeholder="Séries"
+                          placeholder="SÃ©ries"
                           className="border border-[#E8E8E8] rounded px-2 py-1 text-xs focus:outline-none"
                         />
                         <input
@@ -333,7 +333,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                 >
                   {!exerciciosCarregados && <p className="text-xs text-[#7F8C8D]">Passe o mouse para carregar...</p>}
                   {exerciciosCarregados && exercicios.length === 0 && (
-                    <p className="text-xs text-[#7F8C8D]">Nenhum exercício na biblioteca. Crie na aba "Exercícios".</p>
+                    <p className="text-xs text-[#7F8C8D]">Nenhum exercÃ­cio na biblioteca. Crie na aba "ExercÃ­cios".</p>
                   )}
                   {exercicios.map(ex => {
                     const jaAdicionado = (editandoSeq.exercicios ?? []).some(e => e.exercicio_id === ex.id)
@@ -349,7 +349,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                         }`}
                       >
                         <span className="text-[#2C3E50] font-medium">{ex.nome}</span>
-                        <span className="text-xs text-[#7F8C8D]">{ex.grupo_muscular ?? ''}{ex.nivel ? ` · ${ex.nivel}` : ''}</span>
+                        <span className="text-xs text-[#7F8C8D]">{ex.grupo_muscular ?? ''}{ex.nivel ? ` Â· ${ex.nivel}` : ''}</span>
                       </button>
                     )
                   })}
@@ -365,13 +365,13 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                   disabled={isPending}
                   className="px-4 py-2 rounded-lg bg-[#4A3AE8] text-white text-sm font-semibold hover:bg-[#3829c7] disabled:opacity-60"
                 >
-                  {isPending ? 'Salvando…' : 'Salvar Sequência'}
+                  {isPending ? 'Salvandoâ€¦' : 'Salvar SequÃªncia'}
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── Aba Exercícios ── */}
+          {/* â”€â”€ Aba ExercÃ­cios â”€â”€ */}
           {aba === 'exercicios' && !editandoEx && (
             <div className="space-y-3">
               <div className="flex justify-end">
@@ -379,18 +379,18 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                   onClick={() => setEditandoEx({ nome: '', descricao: null, grupo_muscular: null, nivel: null })}
                   className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3829c7] transition-colors"
                 >
-                  <Plus size={14} /> Novo Exercício
+                  <Plus size={14} /> Novo ExercÃ­cio
                 </button>
               </div>
               {exercicios.length === 0 && (
-                <p className="text-sm text-[#7F8C8D] text-center py-8">Nenhum exercício cadastrado.</p>
+                <p className="text-sm text-[#7F8C8D] text-center py-8">Nenhum exercÃ­cio cadastrado.</p>
               )}
               {exercicios.map(ex => (
                 <div key={ex.id} className="flex items-center gap-3 p-3 bg-[#F8F9FA] rounded-xl border border-[#E8E8E8]">
                   <div className="flex-1">
                     <p className="font-medium text-[#2C3E50] text-sm">{ex.nome}</p>
                     <p className="text-xs text-[#7F8C8D]">
-                      {[ex.grupo_muscular, ex.nivel].filter(Boolean).join(' · ') || '—'}
+                      {[ex.grupo_muscular, ex.nivel].filter(Boolean).join(' Â· ') || 'â€”'}
                     </p>
                   </div>
                   <button onClick={() => setEditandoEx(ex)} className="p-1.5 rounded-lg hover:bg-[#E8E8E8] transition-colors">
@@ -404,15 +404,15 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
             </div>
           )}
 
-          {/* ── Editor de exercício ── */}
+          {/* â”€â”€ Editor de exercÃ­cio â”€â”€ */}
           {aba === 'exercicios' && editandoEx && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <button onClick={() => setEditandoEx(null)} className="text-sm text-[#7F8C8D] hover:text-[#2C3E50]">
-                  ← Voltar
+                  â† Voltar
                 </button>
                 <h3 className="font-semibold text-[#2C3E50] text-sm">
-                  {editandoEx.id ? 'Editar Exercício' : 'Novo Exercício'}
+                  {editandoEx.id ? 'Editar ExercÃ­cio' : 'Novo ExercÃ­cio'}
                 </h3>
               </div>
 
@@ -435,20 +435,20 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-[#7F8C8D] mb-1 block">Nível</label>
+                  <label className="text-xs text-[#7F8C8D] mb-1 block">NÃ­vel</label>
                   <select
                     className="w-full border border-[#E8E8E8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A3AE8]/30"
                     value={editandoEx.nivel ?? ''}
                     onChange={e => setEditandoEx(p => ({ ...p, nivel: (e.target.value || null) as any }))}
                   >
-                    <option value="">—</option>
+                    <option value="">â€”</option>
                     <option value="leve">Leve</option>
                     <option value="moderado">Moderado</option>
                     <option value="intenso">Intenso</option>
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs text-[#7F8C8D] mb-1 block">Descrição</label>
+                  <label className="text-xs text-[#7F8C8D] mb-1 block">DescriÃ§Ã£o</label>
                   <textarea
                     rows={2}
                     className="w-full border border-[#E8E8E8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A3AE8]/30 resize-none"
@@ -467,7 +467,7 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
                   disabled={isPending}
                   className="px-4 py-2 rounded-lg bg-[#4A3AE8] text-white text-sm font-semibold hover:bg-[#3829c7] disabled:opacity-60"
                 >
-                  {isPending ? 'Salvando…' : 'Salvar Exercício'}
+                  {isPending ? 'Salvandoâ€¦' : 'Salvar ExercÃ­cio'}
                 </button>
               </div>
             </div>
@@ -477,3 +477,4 @@ export function SequenciasModal({ sequenciasIniciais, onClose, onUpdate }: Props
     </div>
   )
 }
+

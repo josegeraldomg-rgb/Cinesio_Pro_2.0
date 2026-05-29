@@ -1,11 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { X, Eye } from 'lucide-react'
 import type { CampoFormulario } from '@/lib/formularios/tipos'
 import { CATEGORIAS } from '@/lib/formularios/tipos'
 
-// ─── Renderer de campo individual ─────────────────────────────────────────────
+// â”€â”€â”€ Renderer de campo individual â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function CampoPreview({ campo }: { campo: CampoFormulario }) {
   const [texto,      setTexto]      = useState('')
   const [data,       setData]       = useState('')
@@ -13,7 +13,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
   const [multiplas,  setMultiplas]  = useState<string[]>([])
   const [escala,     setEscala]     = useState<number | null>(null)
 
-  // ── Seção ──────────────────────────────────────────────────────────────────
+  // â”€â”€ SeÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (campo.tipo === 'secao') {
     return (
       <div className="pt-4 pb-2 border-b-2 border-gray-100">
@@ -23,7 +23,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
     )
   }
 
-  // ── Instrução ──────────────────────────────────────────────────────────────
+  // â”€â”€ InstruÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (campo.tipo === 'instrucao') {
     return (
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
@@ -33,7 +33,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
     )
   }
 
-  // ── Campos com label ───────────────────────────────────────────────────────
+  // â”€â”€ Campos com label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div className="space-y-2">
       {/* Label */}
@@ -43,7 +43,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
       </div>
       {campo.descricao && <p className="text-xs text-gray-400 -mt-1">{campo.descricao}</p>}
 
-      {/* ── Texto curto ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ Texto curto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {campo.tipo === 'texto_curto' && (
         <input
           type="text"
@@ -54,7 +54,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
         />
       )}
 
-      {/* ── Texto longo ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ Texto longo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {campo.tipo === 'texto_longo' && (
         <textarea
           value={texto}
@@ -65,7 +65,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
         />
       )}
 
-      {/* ── Seleção única ───────────────────────────────────────────────── */}
+      {/* â”€â”€ SeleÃ§Ã£o Ãºnica â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {campo.tipo === 'selecao_unica' && (
         <div className="space-y-2">
           {(campo.opcoes ?? []).map(op => (
@@ -89,7 +89,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
         </div>
       )}
 
-      {/* ── Seleção múltipla ────────────────────────────────────────────── */}
+      {/* â”€â”€ SeleÃ§Ã£o mÃºltipla â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {campo.tipo === 'selecao_multipla' && (
         <div className="space-y-2">
           {(campo.opcoes ?? []).map(op => {
@@ -120,7 +120,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
         </div>
       )}
 
-      {/* ── Escala numérica ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Escala numÃ©rica â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {campo.tipo === 'escala_numerica' && (() => {
         const min  = campo.min ?? 0
         const max  = campo.max ?? 10
@@ -153,7 +153,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
         )
       })()}
 
-      {/* ── Data ────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {campo.tipo === 'data' && (
         <input
           type="date"
@@ -163,7 +163,7 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
         />
       )}
 
-      {/* ── Assinatura ──────────────────────────────────────────────────── */}
+      {/* â”€â”€ Assinatura â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {campo.tipo === 'assinatura' && (
         <div className="h-28 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-1.5 bg-gray-50/50">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
@@ -174,21 +174,21 @@ function CampoPreview({ campo }: { campo: CampoFormulario }) {
         </div>
       )}
 
-      {/* ── Mapa de dor ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ Mapa de dor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {campo.tipo === 'mapa_dor' && (
         <div className="h-32 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-1.5 bg-gray-50/50">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
             <ellipse cx="12" cy="5" rx="3" ry="3.5" />
             <path d="M9,8.5 C7,9 6,11 6,13 L6,17 L8,17 L8,22 L16,22 L16,17 L18,17 L18,13 C18,11 17,9 15,8.5" />
           </svg>
-          <p className="text-xs text-gray-400">Marque as regiões de dor no corpo</p>
+          <p className="text-xs text-gray-400">Marque as regiÃµes de dor no corpo</p>
         </div>
       )}
     </div>
   )
 }
 
-// ─── Modal de Preview ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Modal de Preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Props {
   nome: string
   descricao?: string | null
@@ -201,7 +201,7 @@ export function ModalPreviewFormulario({ nome, descricao, categoria, campos, onC
   const cat = CATEGORIAS[categoria]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
@@ -210,21 +210,21 @@ export function ModalPreviewFormulario({ nome, descricao, categoria, campos, onC
         className="relative bg-[#EDEFF3] rounded-2xl w-full max-w-xl flex flex-col overflow-hidden"
         style={{ maxHeight: '90vh', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}
       >
-        {/* ── Topbar do modal ───────────────────────────────────────────── */}
+        {/* â”€â”€ Topbar do modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-2">
             <Eye size={15} className="text-[#5b5fcf]" />
-            <span className="text-sm font-bold text-gray-700">Pré-visualização</span>
+            <span className="text-sm font-bold text-gray-700">PrÃ©-visualizaÃ§Ã£o</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
             <X size={16} />
           </button>
         </div>
 
-        {/* ── Conteúdo scrollável ───────────────────────────────────────── */}
+        {/* â”€â”€ ConteÃºdo scrollÃ¡vel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
 
-          {/* Header do formulário (como o paciente veria) */}
+          {/* Header do formulÃ¡rio (como o paciente veria) */}
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
             <div className="flex items-start gap-3">
               <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: cat?.corBg ?? '#f3f4f6' }}>
@@ -247,8 +247,8 @@ export function ModalPreviewFormulario({ nome, descricao, categoria, campos, onC
           {/* Campos */}
           {campos.length === 0 ? (
             <div className="bg-white rounded-2xl p-10 flex flex-col items-center text-center" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-              <p className="text-gray-400 text-sm">Este formulário ainda não possui campos.</p>
-              <p className="text-gray-300 text-xs mt-1">Adicione campos no editor para visualizá-los aqui.</p>
+              <p className="text-gray-400 text-sm">Este formulÃ¡rio ainda nÃ£o possui campos.</p>
+              <p className="text-gray-300 text-xs mt-1">Adicione campos no editor para visualizÃ¡-los aqui.</p>
             </div>
           ) : (
             <div className="bg-white rounded-2xl p-5 space-y-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
@@ -256,7 +256,7 @@ export function ModalPreviewFormulario({ nome, descricao, categoria, campos, onC
                 <CampoPreview key={campo.id} campo={campo} />
               ))}
 
-              {/* Botão de envio simulado */}
+              {/* BotÃ£o de envio simulado */}
               <div className="pt-4 border-t border-gray-100">
                 <button
                   type="button"
@@ -271,12 +271,13 @@ export function ModalPreviewFormulario({ nome, descricao, categoria, campos, onC
           )}
         </div>
 
-        {/* ── Rodapé informativo ────────────────────────────────────────── */}
+        {/* â”€â”€ RodapÃ© informativo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="flex items-center justify-center gap-2 py-2.5 bg-amber-50 border-t border-amber-100 flex-shrink-0">
           <Eye size={12} className="text-amber-500" />
-          <p className="text-xs text-amber-600 font-medium">Modo pré-visualização — respostas não serão salvas</p>
+          <p className="text-xs text-amber-600 font-medium">Modo prÃ©-visualizaÃ§Ã£o â€” respostas nÃ£o serÃ£o salvas</p>
         </div>
       </div>
     </div>
   )
 }
+

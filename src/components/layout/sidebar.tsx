@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 
-// SVG do logo oficial do WhatsApp (usado no item de menu)
+// SVG do logo oficial do WhatsApp
 function WhatsAppSvg({ size = 22 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true">
@@ -17,27 +19,26 @@ type NavItem = {
   href:        string
   label:       string
   icon:        string
-  customIcon?: React.ReactNode  // substitui o Material Symbol quando presente
+  customIcon?: React.ReactNode
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard',      label: 'Painel',             icon: 'dashboard' },
-  { href: '/agenda',         label: 'Agenda',              icon: 'calendar_month' },
-  { href: '/pacientes',      label: 'Pacientes',           icon: 'groups' },
-  { href: '/prontuarios',    label: 'Prontuários',         icon: 'clinical_notes' },
-  { href: '/turmas',         label: 'Turmas',              icon: 'sports_gymnastics' },
-  { href: '/biblioteca-exercicios', label: 'Biblioteca',  icon: 'fitness_center' },
-  { href: '/equipe',         label: 'Equipe',              icon: 'badge' },
-  { href: '/financeiro',     label: 'Financeiro',          icon: 'payments' },
-  { href: '/relatorios',     label: 'Relatórios',          icon: 'description' },
-  { href: '/whatsapp',       label: 'WhatsApp',            icon: 'whatsapp', customIcon: <WhatsAppSvg /> },
-  { href: '/portal',         label: 'Portal do Paciente',  icon: 'favorite' },
-  { href: '/configuracoes',  label: 'Configurações',       icon: 'settings' },
+  { href: '/dashboard',            label: 'Painel',             icon: 'dashboard' },
+  { href: '/agenda',               label: 'Agenda',             icon: 'calendar_month' },
+  { href: '/pacientes',            label: 'Pacientes',          icon: 'groups' },
+  { href: '/prontuarios',          label: 'Prontuários',        icon: 'clinical_notes' },
+  { href: '/formularios',          label: 'Formulários',        icon: 'edit_document' },
+  { href: '/turmas',               label: 'Turmas',             icon: 'sports_gymnastics' },
+  { href: '/biblioteca-exercicios',label: 'Biblioteca',         icon: 'fitness_center' },
+  { href: '/equipe',               label: 'Equipe',             icon: 'badge' },
+  { href: '/financeiro',           label: 'Financeiro',         icon: 'payments' },
+  { href: '/relatorios',           label: 'Relatórios',         icon: 'description' },
+  { href: '/whatsapp',             label: 'WhatsApp',           icon: 'whatsapp', customIcon: <WhatsAppSvg /> },
+  { href: '/portal',               label: 'Portal do Paciente', icon: 'favorite' },
+  { href: '/configuracoes',        label: 'Configurações',      icon: 'settings' },
 ]
 
-// Cor do fundo do item ativo — deve ser idêntica ao fundo da página
-// (definido em globals.css como --color-surface) para o efeito de "continuidade".
-const PAGE_BG = '#EDEFF3'
+const PAGE_BG  = '#EDEFF3'
 const SIDEBAR  = '#5b5fcf'
 const CORNER   = 20
 
@@ -49,12 +50,28 @@ interface SidebarProps {
   userName?:    string
   userEmail?:   string
   empresaNome?: string
+  collapsed?:   boolean
 }
 
-export function Sidebar({ userName = 'Usuário', userEmail = '', empresaNome = 'CinesioPro' }: SidebarProps) {
+export function Sidebar({
+  userName    = 'Usuário',
+  userEmail   = '',
+  empresaNome = 'CinesioPro',
+  collapsed   = false,
+}: SidebarProps) {
   const pathname = usePathname()
   const router   = useRouter()
   const supabase = createClient()
+
+  // Tooltip portal — necessário porque o aside tem overflow:hidden
+  const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
+
+  const showTooltip = useCallback((label: string, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect()
+    setTooltip({ label, y: rect.top + rect.height / 2 })
+  }, [])
+
+  const hideTooltip = useCallback(() => setTooltip(null), [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -62,210 +79,328 @@ export function Sidebar({ userName = 'Usuário', userEmail = '', empresaNome = '
     router.refresh()
   }
 
+  const W = collapsed ? 72 : 260
+
+  // ── Ícone compartilhado ─────────────────────────────────────────────────────
+  function NavIcon({ item, active }: { item: NavItem; active: boolean }) {
+    return (
+      <span
+        className="leading-none flex-shrink-0 flex items-center"
+        style={{ width: 22, height: 22 }}
+      >
+        {item.customIcon ?? (
+          <span
+            className="material-symbols-outlined"
+            style={{
+              fontSize: 22,
+              fontVariationSettings: active
+                ? "'FILL' 1, 'wght' 600"
+                : "'FILL' 0, 'wght' 400",
+            }}
+          >
+            {item.icon}
+          </span>
+        )}
+      </span>
+    )
+  }
+
   return (
+  <>
     <aside
-      className="fixed left-4 top-4 bottom-4 z-50 flex flex-col overflow-hidden"
-      style={{ width: 260, borderRadius: 24, background: SIDEBAR, boxShadow: '0 8px 32px rgba(91,95,207,0.25)' }}
+      className="fixed left-4 top-4 bottom-4 z-50 flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out"
+      style={{
+        width: W,
+        borderRadius: 24,
+        background: SIDEBAR,
+        boxShadow: '0 8px 32px rgba(91,95,207,0.25)',
+      }}
     >
-      {/* ── Bloco de Perfil ── */}
-      <div className="flex flex-col items-center pt-7 pb-5 border-b border-white/10 px-4 flex-shrink-0">
+      {/* ── Bloco de Perfil ─────────────────────────────────────────────────── */}
+      <div
+        className="flex flex-col items-center border-b border-white/10 flex-shrink-0 transition-all duration-300 overflow-hidden"
+        style={{
+          paddingTop:    collapsed ? 8  : 20,
+          paddingBottom: collapsed ? 10 : 20,
+          paddingLeft:   16,
+          paddingRight:  16,
+        }}
+      >
+        {/* Avatar */}
         <div
-          className="flex items-center justify-center text-white font-bold text-2xl select-none"
+          className="flex items-center justify-center text-white font-bold select-none transition-all duration-300 flex-shrink-0"
           style={{
-            width: 80, height: 80,
+            width:        collapsed ? 40 : 80,
+            height:       collapsed ? 40 : 80,
             borderRadius: '50%',
-            background: 'rgba(255,255,255,0.15)',
-            boxShadow: '0 0 0 2px rgba(255,255,255,0.4), 0 0 0 6px rgba(91,95,207,0.6)',
+            fontSize:     collapsed ? 15 : 24,
+            background:   'rgba(255,255,255,0.15)',
+            boxShadow:    collapsed
+              ? '0 0 0 2px rgba(255,255,255,0.35)'
+              : '0 0 0 2px rgba(255,255,255,0.4), 0 0 0 6px rgba(91,95,207,0.6)',
           }}
         >
           {getInitial(userName)}
         </div>
-        <p
-          className="mt-4 text-white font-bold truncate max-w-full text-center"
-          style={{ fontSize: 13, letterSpacing: '0.15em', textTransform: 'uppercase' }}
+
+        {/* Nome e email — ocultados quando colapsado */}
+        <div
+          className="overflow-hidden transition-all duration-300 flex flex-col items-center w-full"
+          style={{ maxHeight: collapsed ? 0 : 60, opacity: collapsed ? 0 : 1 }}
         >
-          {userName}
-        </p>
-        <p className="text-white/70 truncate max-w-full text-center" style={{ fontSize: 12 }}>
-          {userEmail}
-        </p>
+          <p
+            className="mt-4 text-white font-bold truncate max-w-full text-center"
+            style={{ fontSize: 13, letterSpacing: '0.15em', textTransform: 'uppercase' }}
+          >
+            {userName}
+          </p>
+          <p className="text-white/70 truncate max-w-full text-center" style={{ fontSize: 12 }}>
+            {userEmail}
+          </p>
+        </div>
       </div>
 
-      {/* ── Navegação ── */}
-      {/*
-        overflow-x: hidden aqui é importante: impede que os cantos côncavos
-        (que ficam exatamente na borda direita do aside) causem scroll horizontal.
-        overflow-y: auto para rolar quando houver muitos itens.
-      */}
+      {/* ── Navegação ─────────────────────────────────────────────────────────── */}
       <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
-          if (isActive) {
+          // ── Modo EXPANDIDO ──────────────────────────────────────────────────
+          if (!collapsed) {
+            if (isActive) {
+              return (
+                <div
+                  key={item.href}
+                  className="relative"
+                  style={{ paddingTop: CORNER, paddingBottom: CORNER }}
+                >
+                  {/* Canto superior côncavo */}
+                  <div
+                    className="absolute right-0 pointer-events-none"
+                    style={{ top: 0, width: CORNER, height: CORNER, background: PAGE_BG }}
+                  >
+                    <div className="absolute inset-0" style={{ background: SIDEBAR, borderRadius: `0 0 ${CORNER}px 0` }} />
+                  </div>
+
+                  {/* Canto inferior côncavo */}
+                  <div
+                    className="absolute right-0 pointer-events-none"
+                    style={{ bottom: 0, width: CORNER, height: CORNER, background: PAGE_BG }}
+                  >
+                    <div className="absolute inset-0" style={{ background: SIDEBAR, borderRadius: `0 ${CORNER}px 0 0` }} />
+                  </div>
+
+                  <Link
+                    href={item.href}
+                    className="flex items-center gap-3 select-none"
+                    style={{
+                      marginLeft: 14,
+                      padding: '12px 0 12px 18px',
+                      background: PAGE_BG,
+                      color: SIDEBAR,
+                      fontWeight: 700,
+                      fontSize: 15,
+                      borderRadius: `${CORNER}px 0 0 ${CORNER}px`,
+                    }}
+                  >
+                    <NavIcon item={item} active />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                </div>
+              )
+            }
+
             return (
-              /*
-                O wrapper tem paddingTop e paddingBottom iguais a CORNER.
-                Isso "reserva" espaço para os cantos côncavos dentro dos limites
-                do próprio div, evitando que o overflow-y:auto do <nav> os corte.
-              */
-              <div
+              <Link
                 key={item.href}
-                className="relative"
-                style={{ paddingTop: CORNER, paddingBottom: CORNER }}
+                href={item.href}
+                className="flex items-center gap-3 transition-all select-none"
+                style={{
+                  marginLeft: 14,
+                  marginTop: 2,
+                  marginBottom: 2,
+                  padding: '12px 0 12px 18px',
+                  color: 'rgba(255,255,255,0.85)',
+                  fontSize: 15,
+                  fontWeight: 500,
+                  borderRadius: '9999px 0 0 9999px',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.10)'
+                  e.currentTarget.style.color = '#ffffff'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.85)'
+                }}
               >
-                {/*
-                  Canto superior côncavo
-                  Técnica: outer = PAGE_BG (fundo da página), inner = SIDEBAR.
-                  O inner SIDEBAR tem o canto inferior-direito arredondado,
-                  deixando PAGE_BG aparecer nesse canto → cria a curva côncava
-                  entre o sidebar e o pill ativo.
-                */}
-                <div
-                  className="absolute right-0 pointer-events-none"
-                  style={{ top: 0, width: CORNER, height: CORNER, background: PAGE_BG }}
-                >
-                  <div
-                    className="absolute inset-0"
-                    style={{ background: SIDEBAR, borderRadius: `0 0 ${CORNER}px 0` }}
-                  />
-                </div>
-
-                {/* Canto inferior côncavo */}
-                <div
-                  className="absolute right-0 pointer-events-none"
-                  style={{ bottom: 0, width: CORNER, height: CORNER, background: PAGE_BG }}
-                >
-                  <div
-                    className="absolute inset-0"
-                    style={{ background: SIDEBAR, borderRadius: `0 ${CORNER}px 0 0` }}
-                  />
-                </div>
-
-                {/* Link ativo */}
-                <Link
-                  href={item.href}
-                  className="flex items-center gap-3 select-none"
-                  style={{
-                    marginLeft: 14,
-                    marginRight: 0,
-                    padding: '12px 0 12px 18px',
-                    background: PAGE_BG,
-                    color: SIDEBAR,
-                    fontWeight: 700,
-                    fontSize: 15,
-                    borderRadius: `${CORNER}px 0 0 ${CORNER}px`,
-                  }}
-                >
-                  <span className="leading-none flex-shrink-0 flex items-center" style={{ width: 22, height: 22 }}>
-                    {item.customIcon ?? (
-                      <span
-                        className="material-symbols-outlined"
-                        style={{ fontSize: 22, fontVariationSettings: "'FILL' 1, 'wght' 600" }}
-                      >
-                        {item.icon}
-                      </span>
-                    )}
-                  </span>
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              </div>
+                <NavIcon item={item} active={false} />
+                <span className="truncate">{item.label}</span>
+              </Link>
             )
           }
 
+          // ── Modo COLAPSADO ──────────────────────────────────────────────────
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 transition-all select-none"
-              style={{
-                marginLeft: 14,
-                marginRight: 0,
-                marginTop: 2,
-                marginBottom: 2,
-                padding: '12px 0 12px 18px',
-                color: 'rgba(255,255,255,0.85)',
-                fontSize: 15,
-                fontWeight: 500,
-                borderRadius: '9999px 0 0 9999px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.10)'
-                e.currentTarget.style.color = '#ffffff'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = 'rgba(255,255,255,0.85)'
-              }}
-            >
-              <span className="leading-none flex-shrink-0 flex items-center" style={{ width: 22, height: 22 }}>
-                {item.customIcon ?? (
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ fontSize: 22, fontVariationSettings: "'FILL' 0, 'wght' 400" }}
-                  >
-                    {item.icon}
-                  </span>
-                )}
-              </span>
-              <span className="truncate">{item.label}</span>
-            </Link>
+            <div key={item.href} className="flex justify-center my-0.5 px-2">
+              <Link
+                href={item.href}
+                className="flex items-center justify-center transition-all select-none"
+                style={{
+                  width: 48,
+                  height: 44,
+                  borderRadius: 12,
+                  background: isActive ? PAGE_BG : 'transparent',
+                  color:      isActive ? SIDEBAR : 'rgba(255,255,255,0.85)',
+                }}
+                onMouseEnter={e => {
+                  showTooltip(item.label, e.currentTarget)
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.12)'
+                    e.currentTarget.style.color = '#ffffff'
+                  }
+                }}
+                onMouseLeave={e => {
+                  hideTooltip()
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.85)'
+                  }
+                }}
+              >
+                <NavIcon item={item} active={isActive} />
+              </Link>
+            </div>
           )
         })}
       </nav>
 
-      {/* ── Sair ── */}
-      <div className="px-4 pb-3 border-t border-white/10 pt-3 flex-shrink-0">
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 w-full px-4 py-2 rounded-full transition-all text-white/85 hover:text-white hover:bg-white/10"
-          style={{ fontSize: 13, fontWeight: 600 }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
-          Sair
-        </button>
+      {/* ── Sair ─────────────────────────────────────────────────────────────── */}
+      <div
+        className="border-t border-white/10 flex-shrink-0 transition-all duration-300"
+        style={{ padding: collapsed ? '10px 0' : '10px 16px' }}
+      >
+        {collapsed ? (
+          /* Colapsado: só o ícone centralizado — tooltip via portal */
+          <div className="flex justify-center">
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center transition-all text-white/75 hover:text-white"
+              style={{ width: 48, height: 40, borderRadius: 12 }}
+              onMouseEnter={e => {
+                showTooltip('Sair', e.currentTarget)
+                e.currentTarget.style.background = 'rgba(255,255,255,0.10)'
+              }}
+              onMouseLeave={e => {
+                hideTooltip()
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 w-full px-4 py-2 rounded-full transition-all text-white/85 hover:text-white hover:bg-white/10"
+            style={{ fontSize: 13, fontWeight: 600 }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
+            Sair
+          </button>
+        )}
       </div>
 
-      {/* ── Equipe Ativa ── */}
-      <div className="px-4 pb-5 flex-shrink-0">
-        <p
-          className="text-white/70 font-bold mb-2"
-          style={{ fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase' }}
-        >
-          Equipe Ativa
-        </p>
-        <div className="flex items-center">
-          {[
-            'https://i.pravatar.cc/32?img=1',
-            'https://i.pravatar.cc/32?img=2',
-            'https://i.pravatar.cc/32?img=3',
-          ].map((src, i) => (
-            <img
-              key={i}
-              src={src}
-              alt=""
-              className="rounded-full object-cover flex-shrink-0"
+      {/* ── Equipe Ativa — oculta quando colapsado ──────────────────────────── */}
+      <div
+        className="overflow-hidden transition-all duration-300 flex-shrink-0"
+        style={{ maxHeight: collapsed ? 0 : 120, opacity: collapsed ? 0 : 1 }}
+      >
+        <div className="px-4 pb-5">
+          <p
+            className="text-white/70 font-bold mb-2"
+            style={{ fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase' }}
+          >
+            Equipe Ativa
+          </p>
+          <div className="flex items-center">
+            {[
+              'https://i.pravatar.cc/32?img=1',
+              'https://i.pravatar.cc/32?img=2',
+              'https://i.pravatar.cc/32?img=3',
+            ].map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt=""
+                className="rounded-full object-cover flex-shrink-0"
+                style={{
+                  width: 32, height: 32,
+                  marginLeft: i === 0 ? 0 : -8,
+                  boxShadow: `0 0 0 2px ${SIDEBAR}`,
+                }}
+              />
+            ))}
+            <div
+              className="flex items-center justify-center text-white font-bold flex-shrink-0"
               style={{
                 width: 32, height: 32,
-                marginLeft: i === 0 ? 0 : -8,
+                borderRadius: '50%',
+                background: '#22c55e',
+                marginLeft: -8,
+                fontSize: 11,
                 boxShadow: `0 0 0 2px ${SIDEBAR}`,
               }}
-            />
-          ))}
-          <div
-            className="flex items-center justify-center text-white font-bold flex-shrink-0"
-            style={{
-              width: 32, height: 32,
-              borderRadius: '50%',
-              background: '#22c55e',
-              marginLeft: -8,
-              fontSize: 11,
-              boxShadow: `0 0 0 2px ${SIDEBAR}`,
-            }}
-          >
-            +12
+            >
+              +12
+            </div>
           </div>
         </div>
       </div>
     </aside>
+
+    {/* ── Tooltip portal ─────────────────────────────────────────────────────── */}
+    {collapsed && tooltip && typeof document !== 'undefined' && createPortal(
+      <div
+        className="pointer-events-none"
+        style={{
+          position:   'fixed',
+          left:       16 + 72 + 10,   // sidebar left(16) + collapsed width(72) + gap(10)
+          top:        tooltip.y,
+          transform:  'translateY(-50%)',
+          zIndex:     9999,
+          display:    'flex',
+          alignItems: 'center',
+          gap:        0,
+        }}
+      >
+        {/* Seta */}
+        <div style={{
+          width:       0,
+          height:      0,
+          borderTop:   '5px solid transparent',
+          borderBottom:'5px solid transparent',
+          borderRight: '6px solid #1E293B',
+          flexShrink:  0,
+        }} />
+        {/* Label */}
+        <div style={{
+          background:   '#1E293B',
+          color:        '#F8FAFC',
+          fontSize:     12,
+          fontWeight:   600,
+          padding:      '5px 10px',
+          borderRadius: 8,
+          whiteSpace:   'nowrap',
+          boxShadow:    '0 4px 14px rgba(0,0,0,0.25)',
+          letterSpacing:'0.01em',
+        }}>
+          {tooltip.label}
+        </div>
+      </div>,
+      document.body,
+    )}
+  </>
   )
 }
+

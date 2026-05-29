@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
@@ -11,16 +11,16 @@ import { CATEGORIAS } from '@/lib/formularios/tipos'
 import { enviarTextWaAction } from '@/app/(dashboard)/whatsapp/actions'
 import { obterMensagemTemplateAction } from '@/app/(dashboard)/whatsapp/templates-actions'
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Paciente { id: string; nome: string; ddi: string | null; telefone: string | null; email: string | null }
 interface Formulario { id: string; nome: string; categoria: string; status: string }
 
 interface Props {
-  /** Formulário já escolhido (ex: clicou "Enviar" num card da lista) */
+  /** FormulÃ¡rio jÃ¡ escolhido (ex: clicou "Enviar" num card da lista) */
   formularioId?:   string
   formularioNome?: string
   formularioCat?:  string
-  /** Paciente já escolhido (ex: abriu da página do paciente) */
+  /** Paciente jÃ¡ escolhido (ex: abriu da pÃ¡gina do paciente) */
   pacienteId?:     string
   pacienteNome?:   string
   pacienteTelefone?: string
@@ -32,7 +32,7 @@ interface Props {
 type Via = 'whatsapp' | 'email' | 'link'
 type Etapa = 'form' | 'sucesso'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function fmtFone(ddi: string | null, tel: string | null) {
   if (!tel) return null
   const d = (ddi ?? '55').replace(/\D/g, '')
@@ -45,16 +45,16 @@ function whatsappUrl(fone: string, msg: string) {
 }
 
 function mailtoUrl(email: string, link: string, nome: string) {
-  const sub = encodeURIComponent(`Formulário para preencher — ${nome}`)
+  const sub = encodeURIComponent(`FormulÃ¡rio para preencher â€” ${nome}`)
   const body = encodeURIComponent(
-    `Olá!\n\nPor favor, preencha o formulário abaixo antes da sua próxima consulta:\n${link}\n\nAté logo!`
+    `OlÃ¡!\n\nPor favor, preencha o formulÃ¡rio abaixo antes da sua prÃ³xima consulta:\n${link}\n\nAtÃ© logo!`
   )
   return `mailto:${email}?subject=${sub}&body=${body}`
 }
 
-// ─── Sub-componentes ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Sub-componentes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/** Campo de busca de paciente com dropdown assíncrono */
+/** Campo de busca de paciente com dropdown assÃ­ncrono */
 function BuscaPaciente({ onSelect }: { onSelect: (p: Paciente) => void }) {
   const [query, setQuery]         = useState('')
   const [results, setResults]     = useState<Paciente[]>([])
@@ -129,7 +129,7 @@ function BuscaPaciente({ onSelect }: { onSelect: (p: Paciente) => void }) {
   )
 }
 
-/** Dropdown de formulários da clínica */
+/** Dropdown de formulÃ¡rios da clÃ­nica */
 function SeletorFormulario({ onSelect }: { onSelect: (f: Formulario) => void }) {
   const [lista,   setLista]   = useState<Formulario[]>([])
   const [aberto,  setAberto]  = useState(false)
@@ -169,7 +169,7 @@ function SeletorFormulario({ onSelect }: { onSelect: (f: Formulario) => void }) 
             {selecionado.nome}
           </span>
         ) : (
-          <span className="text-gray-400">Selecionar formulário...</span>
+          <span className="text-gray-400">Selecionar formulÃ¡rio...</span>
         )}
         <ChevronDown size={14} className={`text-gray-400 flex-shrink-0 transition-transform ${aberto ? 'rotate-180' : ''}`} />
       </button>
@@ -180,8 +180,8 @@ function SeletorFormulario({ onSelect }: { onSelect: (f: Formulario) => void }) 
           <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-white rounded-xl border border-gray-100 shadow-lg overflow-hidden">
             {lista.length === 0 ? (
               <div className="px-4 py-4 text-sm text-gray-400 text-center">
-                Nenhum formulário publicado. <br/>
-                <a href="/formularios/criar" className="text-[#5b5fcf] font-medium">Criar um agora →</a>
+                Nenhum formulÃ¡rio publicado. <br/>
+                <a href="/formularios/criar" className="text-[#5b5fcf] font-medium">Criar um agora â†’</a>
               </div>
             ) : (
               <div className="overflow-y-auto" style={{ maxHeight: 220 }}>
@@ -214,14 +214,14 @@ function SeletorFormulario({ onSelect }: { onSelect: (f: Formulario) => void }) 
   )
 }
 
-// ─── Modal principal ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Modal principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function ModalEnviarFormulario({
   formularioId: fIdProp, formularioNome: fNomeProp, formularioCat: fCatProp,
   pacienteId: pIdProp, pacienteNome: pNomeProp, pacienteTelefone: pTelProp, pacienteDdi: pDdiProp,
   onClose, onSuccess,
 }: Props) {
 
-  // Formulário selecionado
+  // FormulÃ¡rio selecionado
   const [fId,   setFId]   = useState(fIdProp ?? '')
   const [fNome, setFNome] = useState(fNomeProp ?? '')
   const [fCat,  setFCat]  = useState(fCatProp ?? '')
@@ -248,7 +248,7 @@ export function ModalEnviarFormulario({
   const [waEnviado,     setWaEnviado]     = useState(false)
   const [waErro,        setWaErro]        = useState<string | null>(null)
 
-  // ── Handlers ────────────────────────────────────────────────────────────
+  // â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function selecionarPaciente(p: Paciente) {
     setPId(p.id); setPNome(p.nome)
     setPTel(p.telefone ?? ''); setPDdi(p.ddi?.replace('+', '') ?? '55')
@@ -261,10 +261,10 @@ export function ModalEnviarFormulario({
 
   async function enviar() {
     setErro(null)
-    if (!fId)  { setErro('Selecione um formulário.'); return }
+    if (!fId)  { setErro('Selecione um formulÃ¡rio.'); return }
     if (!pId)  { setErro('Selecione um paciente.'); return }
-    if (via === 'whatsapp' && !pTel) { setErro('Este paciente não tem telefone cadastrado.'); return }
-    if (via === 'email'    && !pEmail) { setErro('Este paciente não tem e-mail cadastrado.'); return }
+    if (via === 'whatsapp' && !pTel) { setErro('Este paciente nÃ£o tem telefone cadastrado.'); return }
+    if (via === 'email'    && !pEmail) { setErro('Este paciente nÃ£o tem e-mail cadastrado.'); return }
 
     setEnviando(true)
     try {
@@ -302,13 +302,13 @@ export function ModalEnviarFormulario({
     const fone = fmtFone(pDdi, pTel)
     if (!fone) return
 
-    // Mensagem padrão usada como fallback caso não haja template salvo
-    const msgFallback = `Olá, ${pNome}! 👋\n\nPor favor, preencha o formulário *${fNome}* antes da sua próxima consulta:\n\n🔗 ${linkGerado}\n\nQualquer dúvida, estamos à disposição!`
+    // Mensagem padrÃ£o usada como fallback caso nÃ£o haja template salvo
+    const msgFallback = `OlÃ¡, ${pNome}! ðŸ‘‹\n\nPor favor, preencha o formulÃ¡rio *${fNome}* antes da sua prÃ³xima consulta:\n\nðŸ”— ${linkGerado}\n\nQualquer dÃºvida, estamos Ã  disposiÃ§Ã£o!`
 
     setWaSending(true)
     setWaErro(null)
 
-    // Tenta buscar o template configurado na tela /whatsapp → Templates
+    // Tenta buscar o template configurado na tela /whatsapp â†’ Templates
     const tplResult = await obterMensagemTemplateAction(
       'envio_formulario',
       {
@@ -316,8 +316,8 @@ export function ModalEnviarFormulario({
         formulario_nome: fNome,
         link_formulario: linkGerado,
       },
-      // Fallback inline (usado se não houver template salvo no banco)
-      `Olá, [[cliente_nome]]! 👋\n\nPor favor, preencha o formulário *[[formulario_nome]]* antes da sua próxima consulta:\n\n🔗 [[link_formulario]]\n\nQualquer dúvida, estamos à disposição! 😊`,
+      // Fallback inline (usado se nÃ£o houver template salvo no banco)
+      `OlÃ¡, [[cliente_nome]]! ðŸ‘‹\n\nPor favor, preencha o formulÃ¡rio *[[formulario_nome]]* antes da sua prÃ³xima consulta:\n\nðŸ”— [[link_formulario]]\n\nQualquer dÃºvida, estamos Ã  disposiÃ§Ã£o! ðŸ˜Š`,
     )
 
     const msg = 'mensagem' in tplResult ? tplResult.mensagem : msgFallback
@@ -328,7 +328,7 @@ export function ModalEnviarFormulario({
     if ('ok' in result) {
       setWaEnviado(true)
     } else {
-      // UAZAPI indisponível ou desconectado — abre wa.me como fallback
+      // UAZAPI indisponÃ­vel ou desconectado â€” abre wa.me como fallback
       setWaErro(result.error)
       window.open(result.fallbackUrl, '_blank')
     }
@@ -341,9 +341,9 @@ export function ModalEnviarFormulario({
 
   const catInfo = CATEGORIAS[fCat]
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       {/* Overlay */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
@@ -352,14 +352,14 @@ export function ModalEnviarFormulario({
         className="relative bg-white rounded-2xl w-full flex flex-col overflow-hidden"
         style={{ maxWidth: 480, maxHeight: '92vh', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}
       >
-        {/* ── Header ────────────────────────────────────────────────────── */}
+        {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#5b5fcf]/10 flex items-center justify-center">
               <Send size={17} className="text-[#5b5fcf]" />
             </div>
             <div>
-              <p className="font-bold text-gray-900 text-sm">Enviar Formulário</p>
+              <p className="font-bold text-gray-900 text-sm">Enviar FormulÃ¡rio</p>
               <p className="text-xs text-gray-400">
                 {etapa === 'sucesso' ? 'Link gerado com sucesso' : 'Configure e envie ao paciente'}
               </p>
@@ -370,17 +370,17 @@ export function ModalEnviarFormulario({
           </button>
         </div>
 
-        {/* ── Etapa: formulário ─────────────────────────────────────────── */}
+        {/* â”€â”€ Etapa: formulÃ¡rio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {etapa === 'form' && (
           <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
 
-            {/* Formulário */}
+            {/* FormulÃ¡rio */}
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block flex items-center gap-1.5">
-                <FileText size={12} /> Formulário
+                <FileText size={12} /> FormulÃ¡rio
               </label>
               {fIdProp ? (
-                /* Pré-selecionado */
+                /* PrÃ©-selecionado */
                 <div className="flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
                   {catInfo && (
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: catInfo.corBg }}>
@@ -403,7 +403,7 @@ export function ModalEnviarFormulario({
                 <User size={12} /> Paciente
               </label>
               {pIdProp ? (
-                /* Pré-selecionado */
+                /* PrÃ©-selecionado */
                 <div className="flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
                   <div className="w-7 h-7 rounded-full bg-[#5b5fcf]/10 flex items-center justify-center flex-shrink-0 text-xs font-bold text-[#5b5fcf]">
                     {pNomeProp?.charAt(0).toUpperCase()}
@@ -415,16 +415,16 @@ export function ModalEnviarFormulario({
               )}
             </div>
 
-            {/* Método de envio */}
+            {/* MÃ©todo de envio */}
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block flex items-center gap-1.5">
-                <Send size={12} /> Método de Envio
+                <Send size={12} /> MÃ©todo de Envio
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {([
                   { val: 'whatsapp', Icon: MessageCircle, label: 'WhatsApp', cor: '#25d366', bg: '#f0fdf4', disabled: !pTel && !!pIdProp },
                   { val: 'email',    Icon: Mail,          label: 'E-mail',   cor: '#3b82f6', bg: '#eff6ff', disabled: !pEmail && !!pIdProp },
-                  { val: 'link',     Icon: Link2,         label: 'Só link',  cor: '#6b7280', bg: '#f9fafb', disabled: false },
+                  { val: 'link',     Icon: Link2,         label: 'SÃ³ link',  cor: '#6b7280', bg: '#f9fafb', disabled: false },
                 ] as const).map(({ val, Icon, label, cor, bg, disabled }) => (
                   <button
                     key={val}
@@ -445,7 +445,7 @@ export function ModalEnviarFormulario({
               </div>
               {via === 'whatsapp' && !pTel && !pIdProp && pId && (
                 <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
-                  <AlertCircle size={11} /> Paciente sem telefone. O link será gerado mas não enviado automaticamente.
+                  <AlertCircle size={11} /> Paciente sem telefone. O link serÃ¡ gerado mas nÃ£o enviado automaticamente.
                 </p>
               )}
             </div>
@@ -472,7 +472,7 @@ export function ModalEnviarFormulario({
                 ))}
               </div>
               <p className="text-xs text-gray-400 mt-1.5">
-                O paciente terá {diasExp} dia{diasExp > 1 ? 's' : ''} para responder
+                O paciente terÃ¡ {diasExp} dia{diasExp > 1 ? 's' : ''} para responder
               </p>
             </div>
 
@@ -485,23 +485,23 @@ export function ModalEnviarFormulario({
           </div>
         )}
 
-        {/* ── Etapa: sucesso ────────────────────────────────────────────── */}
+        {/* â”€â”€ Etapa: sucesso â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {etapa === 'sucesso' && (
           <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-5">
-            {/* Confirmação */}
+            {/* ConfirmaÃ§Ã£o */}
             <div className="flex flex-col items-center text-center gap-2">
               <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-1">
                 <CheckCheck size={26} className="text-green-500" />
               </div>
               <p className="font-bold text-gray-900">Envio criado!</p>
               <p className="text-sm text-gray-500">
-                O formulário <strong>{fNome}</strong> foi vinculado a <strong>{pNome}</strong>.
+                O formulÃ¡rio <strong>{fNome}</strong> foi vinculado a <strong>{pNome}</strong>.
               </p>
             </div>
 
             {/* Link */}
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Link do formulário</label>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Link do formulÃ¡rio</label>
               <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
                 <p className="flex-1 text-xs text-gray-600 font-mono truncate">{linkGerado}</p>
                 <button
@@ -515,7 +515,7 @@ export function ModalEnviarFormulario({
               </div>
             </div>
 
-            {/* Botões de envio rápido */}
+            {/* BotÃµes de envio rÃ¡pido */}
             <div className="flex flex-col gap-2">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Enviar agora</p>
               {pTel && (
@@ -537,7 +537,7 @@ export function ModalEnviarFormulario({
               {waErro && (
                 <p className="text-xs text-amber-600 flex items-center gap-1.5">
                   <AlertCircle size={12} className="flex-shrink-0" />
-                  WhatsApp automático indisponível — o link foi aberto no navegador.
+                  WhatsApp automÃ¡tico indisponÃ­vel â€” o link foi aberto no navegador.
                 </p>
               )}
               {pEmail && (
@@ -563,13 +563,13 @@ export function ModalEnviarFormulario({
               <Clock size={14} className="text-amber-500 flex-shrink-0" />
               <p className="text-xs text-amber-700">
                 Este link expira em <strong>{diasExp} dia{diasExp > 1 ? 's' : ''}</strong>.
-                Quando respondido, as respostas vão direto para o prontuário do paciente.
+                Quando respondido, as respostas vÃ£o direto para o prontuÃ¡rio do paciente.
               </p>
             </div>
           </div>
         )}
 
-        {/* ── Footer ────────────────────────────────────────────────────── */}
+        {/* â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex gap-3">
           {etapa === 'form' ? (
             <>
@@ -602,3 +602,4 @@ export function ModalEnviarFormulario({
     </div>
   )
 }
+

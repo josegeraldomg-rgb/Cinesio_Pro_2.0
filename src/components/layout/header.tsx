@@ -18,7 +18,8 @@ const PAGE_META: Record<string, { title: string; description: string }> = {
   '/whatsapp':      { title: 'WhatsApp',           description: 'Mensagens, lembretes e atendimento' },
   '/formularios':   { title: 'Formulários',        description: 'Crie e envie formulários aos pacientes' },
   '/portal':        { title: 'Portal do Paciente', description: 'Experiência do paciente: progresso e agendamentos' },
-  '/configuracoes': { title: 'Configurações',      description: 'Empresa, equipe, serviços e integrações' },
+  '/configuracoes':         { title: 'Configurações',         description: 'Empresa, equipe, serviços e integrações' },
+  '/biblioteca-exercicios': { title: 'Biblioteca de Exercícios', description: 'Gerencie exercícios, sequências de aula e planos de tratamento' },
 }
 
 function getPageMeta(pathname: string) {
@@ -28,7 +29,7 @@ function getPageMeta(pathname: string) {
   return PAGE_META[segment] ?? { title: '', description: '' }
 }
 
-export function Header() {
+export function Header({ marginLeft }: { marginLeft?: number }) {
   const [search, setSearch] = useState('')
   const pathname = usePathname()
 
@@ -50,8 +51,8 @@ export function Header() {
 
   return (
     <header
-      className="h-20 flex items-center justify-between px-6 fixed top-0 right-0 left-[280px] z-40"
-      style={{ background: 'transparent' }}
+      className="h-20 flex items-center justify-between px-6 fixed top-0 right-0 z-40 transition-[left] duration-300 ease-in-out"
+      style={{ background: 'transparent', left: marginLeft ?? 280 }}
     >
       {/* Título + descrição da tela */}
       <div className="flex flex-col justify-center min-w-0">

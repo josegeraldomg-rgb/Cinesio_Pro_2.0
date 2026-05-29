@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { Bell, BellOff, Phone, MessageCircle, X, Clock, Calendar, User2, Stethoscope, CheckCircle2 } from 'lucide-react'
@@ -6,7 +6,7 @@ import type { EntradaListaEspera } from '@/app/(dashboard)/agenda/lista-espera-a
 import { mudarStatusListaEsperaAction } from '@/app/(dashboard)/agenda/lista-espera-actions'
 
 interface Props {
-  entradas: EntradaListaEspera[]   // compatíveis com o slot vago
+  entradas: EntradaListaEspera[]   // compatÃ­veis com o slot vago
   slotData: string                  // "YYYY-MM-DD"
   slotHora: string                  // "HH:MM"
   profissionalNome?: string
@@ -32,7 +32,7 @@ export function NotificacaoVagaModal({ entradas, slotData, slotHora, profissiona
     setSalvando(s => ({ ...s, [id]: true }))
     try {
       if (metodo === 'whatsapp' && entrada.paciente_telefone) {
-        const texto = `Olá, ${entrada.paciente_nome}! 😊 Uma vaga abriu na nossa agenda para o dia ${fmtData(slotData)} às ${slotHora}${profissionalNome ? ` com ${profissionalNome}` : ''}. Entre em contato para confirmar seu agendamento!`
+        const texto = `OlÃ¡, ${entrada.paciente_nome}! ðŸ˜Š Uma vaga abriu na nossa agenda para o dia ${fmtData(slotData)} Ã s ${slotHora}${profissionalNome ? ` com ${profissionalNome}` : ''}. Entre em contato para confirmar seu agendamento!`
         window.open(buildWhatsApp(entrada.paciente_telefone, entrada.paciente_ddi ?? '55', texto), '_blank')
       }
       const res = await mudarStatusListaEsperaAction(id, 'notificado')
@@ -49,18 +49,18 @@ export function NotificacaoVagaModal({ entradas, slotData, slotHora, profissiona
   const resolvidas = entradas.filter(e => notificados.has(e.id))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E8E8] flex-shrink-0">
           <div>
             <h2 className="font-bold text-[#2C3E50] text-base flex items-center gap-2">
               <Bell size={18} className="text-orange-500" />
-              Vaga Disponível — Lista de Espera
+              Vaga DisponÃ­vel â€” Lista de Espera
             </h2>
             <p className="text-xs text-[#7F8C8D] mt-0.5">
-              {fmtData(slotData)} às {slotHora}{profissionalNome ? ` · ${profissionalNome}` : ''} ·{' '}
-              <span className="font-medium text-orange-500">{pendentes.length} paciente{pendentes.length !== 1 ? 's' : ''} compatíve{pendentes.length !== 1 ? 'is' : 'l'}</span>
+              {fmtData(slotData)} Ã s {slotHora}{profissionalNome ? ` Â· ${profissionalNome}` : ''} Â·{' '}
+              <span className="font-medium text-orange-500">{pendentes.length} paciente{pendentes.length !== 1 ? 's' : ''} compatÃ­ve{pendentes.length !== 1 ? 'is' : 'l'}</span>
             </p>
           </div>
           <button
@@ -77,7 +77,7 @@ export function NotificacaoVagaModal({ entradas, slotData, slotHora, profissiona
             <div className="text-center py-8">
               <CheckCircle2 size={40} className="text-green-500 mx-auto mb-3" />
               <p className="font-semibold text-[#2C3E50]">Todos os pacientes foram notificados!</p>
-              <p className="text-xs text-[#7F8C8D] mt-1">Você pode fechar este painel.</p>
+              <p className="text-xs text-[#7F8C8D] mt-1">VocÃª pode fechar este painel.</p>
             </div>
           )}
 
@@ -96,7 +96,7 @@ export function NotificacaoVagaModal({ entradas, slotData, slotHora, profissiona
 
           {resolvidas.length > 0 && pendentes.length > 0 && (
             <p className="text-xs text-[#7F8C8D] text-center pt-2">
-              {resolvidas.length} já notificado{resolvidas.length !== 1 ? 's' : ''}
+              {resolvidas.length} jÃ¡ notificado{resolvidas.length !== 1 ? 's' : ''}
             </p>
           )}
         </div>
@@ -153,19 +153,19 @@ function EntradaNotificacaoCard({ entrada, salvando, onIgnorar, onManual, onWhat
             <span className="flex items-center gap-1">
               <Calendar size={11} />
               {fmtData(entrada.data_inicio)}
-              {entrada.data_fim !== entrada.data_inicio && ` → ${fmtData(entrada.data_fim)}`}
+              {entrada.data_fim !== entrada.data_inicio && ` â†’ ${fmtData(entrada.data_fim)}`}
             </span>
             {entrada.hora_inicio && (
               <span className="flex items-center gap-1">
                 <Clock size={11} />
-                {entrada.hora_inicio}{entrada.hora_fim ? ` – ${entrada.hora_fim}` : ''}
+                {entrada.hora_inicio}{entrada.hora_fim ? ` â€“ ${entrada.hora_fim}` : ''}
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Ações */}
+      {/* AÃ§Ãµes */}
       <div className="flex items-center gap-2 flex-wrap pt-1">
         <button
           onClick={onIgnorar}
@@ -193,9 +193,10 @@ function EntradaNotificacaoCard({ entrada, salvando, onIgnorar, onManual, onWhat
           </button>
         )}
         {salvando && (
-          <span className="text-xs text-[#7F8C8D] animate-pulse">Salvando…</span>
+          <span className="text-xs text-[#7F8C8D] animate-pulse">Salvandoâ€¦</span>
         )}
       </div>
     </div>
   )
 }
+

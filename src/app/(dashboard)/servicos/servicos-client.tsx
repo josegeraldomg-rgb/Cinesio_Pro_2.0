@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Tag, LayoutGrid, Plus, Search, X } from 'lucide-react'
+import { Tag, LayoutGrid, Plus, Search, X, MessageSquare } from 'lucide-react'
 import { ListaServicos } from '@/components/servicos/lista-servicos'
 import { ListaCategorias } from '@/components/servicos/lista-categorias'
 import { ServicoForm } from '@/components/servicos/servico-form'
 import { CategoriaForm } from '@/components/servicos/categoria-form'
 import { VinculoProfissionais } from '@/components/servicos/vinculo-profissionais'
+import { OrientacoesTab } from '@/components/servicos/orientacoes-tab'
 
-type Tab = 'servicos' | 'categorias'
+type Tab = 'servicos' | 'categorias' | 'orientacoes'
 type StatusFilter = 'ativos' | 'inativos' | 'todos'
 
 export interface Servico {
@@ -99,9 +100,10 @@ export function ServicosClient(props: Props) {
     })
   }, [servicos, vinculos, busca, filtroCat, filtroProf, filtroStatus, filtroOnline])
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
-    { id: 'servicos',   label: 'Serviços',   icon: <Tag size={15} />,        count: tab === 'servicos' ? servicosFiltrados.length : servicos.length },
-    { id: 'categorias', label: 'Categorias', icon: <LayoutGrid size={15} />, count: categorias.length },
+  const tabs: { id: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
+    { id: 'servicos',    label: 'Serviços',    icon: <Tag size={15} />,          count: tab === 'servicos' ? servicosFiltrados.length : servicos.length },
+    { id: 'categorias',  label: 'Categorias',  icon: <LayoutGrid size={15} />,   count: categorias.length },
+    { id: 'orientacoes', label: 'Orientações', icon: <MessageSquare size={15} /> },
   ]
 
   const filtrosAtivos = !!(busca || filtroCat || filtroProf || filtroOnline || filtroStatus !== 'ativos')
@@ -129,22 +131,26 @@ export function ServicosClient(props: Props) {
             >
               {t.icon}
               {t.label}
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                tab === t.id ? 'bg-[#4A3AE8] text-white' : 'bg-[#E8E8E8] text-[#7F8C8D]'
-              }`}>
-                {t.count}
-              </span>
+              {t.count !== undefined && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  tab === t.id ? 'bg-[#4A3AE8] text-white' : 'bg-[#E8E8E8] text-[#7F8C8D]'
+                }`}>
+                  {t.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        <button
-          onClick={() => tab === 'servicos' ? setCreatingServico(true) : setCreatingCategoria(true)}
-          className="flex items-center gap-2 bg-[#4A3AE8] text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-[#3829c7] shadow-md"
-        >
-          <Plus size={16} />
-          {tab === 'servicos' ? 'Novo Serviço' : 'Nova Categoria'}
-        </button>
+        {tab !== 'orientacoes' && (
+          <button
+            onClick={() => tab === 'servicos' ? setCreatingServico(true) : setCreatingCategoria(true)}
+            className="flex items-center gap-2 bg-[#4A3AE8] text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-[#3829c7] shadow-md"
+          >
+            <Plus size={16} />
+            {tab === 'servicos' ? 'Novo Serviço' : 'Nova Categoria'}
+          </button>
+        )}
       </div>
 
       {/* Barra de filtros — só para a tab Serviços */}
@@ -253,6 +259,14 @@ export function ServicosClient(props: Props) {
           servicos={servicos}
           podeEditar={podeEditar}
           onEdit={setEditingCategoria}
+        />
+      )}
+
+      {tab === 'orientacoes' && (
+        <OrientacoesTab
+          servicos={servicos}
+          profissionais={profissionais}
+          vinculos={vinculos}
         />
       )}
 

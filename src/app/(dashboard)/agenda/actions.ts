@@ -9,6 +9,7 @@ import {
   toDateStr,
   type RecorrenciaConfig,
 } from '@/lib/scheduling/gerar-ocorrencias'
+import { dispararOrientacaoAction } from '@/app/(dashboard)/servicos/orientacoes-actions'
 
 async function getContext() {
   const supabase = await createClient()
@@ -254,6 +255,17 @@ export async function criarAgendamentoAction(payload: NovoAgendamentoPayload) {
     .single()
 
   if (error) return { error: error.message }
+
+  // Dispara orientação automática (fire-and-forget — não bloqueia a resposta)
+  if (novo?.id) {
+    dispararOrientacaoAction({
+      empresa_id:      empresa_id,
+      servico_id:      servico_id,
+      profissional_id: profissional_id,
+      paciente_id:     paciente_id,
+      data_hora,
+    }).catch(() => { /* silencioso — log interno apenas */ })
+  }
 
   revalidatePath('/agenda')
   return { success: true, id: novo?.id }

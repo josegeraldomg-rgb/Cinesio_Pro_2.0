@@ -27,11 +27,17 @@ export function ProfissionalSelector({ profissionais, selecionado, onChange }: P
       </select>
 
       {sel && (
-        <div
-          className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs pointer-events-none"
-          style={{ background: sel.cor_agenda ?? '#4A3AE8' }}
-        >
-          {sel.nome.charAt(0).toUpperCase()}
+        <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full overflow-hidden flex items-center justify-center pointer-events-none">
+          {sel.avatar_url ? (
+            <img src={sel.avatar_url} alt={sel.nome} className="w-full h-full object-cover" />
+          ) : (
+            <div
+              className="w-full h-full flex items-center justify-center text-white font-bold text-xs"
+              style={{ background: sel.cor_agenda ?? '#4A3AE8' }}
+            >
+              {sel.nome.charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
       )}
 

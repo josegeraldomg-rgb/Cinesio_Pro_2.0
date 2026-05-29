@@ -7,6 +7,60 @@ import { gerarSessoesTurma } from '@/lib/scheduling/gerar-sessoes-turma'
 
 // ─── Tipos exportados ────────────────────────────────────────────────────────
 
+// ── Novos tipos (modelo reestruturado) ───────────────────────────────────────
+
+export interface PlanoServico {
+  id: string
+  servico_id: string
+  nome: string
+  dias_semana: number
+  valor_mensal: number
+  ativo: boolean
+  servicos?: { nome: string } | null
+}
+
+export interface NovaMatricula {
+  id: string
+  paciente_id: string
+  plano_id: string
+  data_matricula: string
+  data_saida: string | null
+  status: string
+  observacoes: string | null
+  pacientes?: { nome: string; telefone: string | null } | null
+  planos_servico?: { nome: string; dias_semana: number; valor_mensal: number; servicos?: { nome: string } | null } | null
+  slots?: MatriculaSlotDetalhe[]
+}
+
+export interface MatriculaSlotDetalhe {
+  id: string
+  slot_id: string
+  ativo: boolean
+  turma_slots?: {
+    id: string
+    dia_semana: number
+    hora_inicio: string
+    vagas_total: number | null
+    turmas?: { id: string; nome: string; servico_id: string | null } | null
+  } | null
+}
+
+export interface TurmaSlotComVagas {
+  id: string
+  turma_id: string
+  dia_semana: number
+  hora_inicio: string
+  hora_fim: string
+  duracao_minutos: number
+  capacidade_maxima: number | null
+  vagas_total: number | null
+  vagas_livres: number
+  ativo: boolean
+  turmas?: { id: string; nome: string; servico_id: string | null } | null
+}
+
+// ── Tipos originais ──────────────────────────────────────────────────────────
+
 export interface TurmaSlot {
   id: string
   turma_id: string
@@ -427,6 +481,355 @@ export async function buscarTurmaComMatriculasAction(turmaId: string): Promise<
   }))
 
   return { turma, matriculas }
+}
+
+// ─── Novo modelo: Planos de Serviço ──────────────────────────────────────────
+
+export interface SlotComVagas {
+  id: string
+  turma_id: string
+  dia_semana: number
+  hora_inicio: string
+  hora_fim: string
+  duracao_minutos: number
+  vagas_total: number
+  vagas_livres: number
+  ativo: boolean
+  turmas?: { id: string; nome: string; servico_id: string | null; nivel: string } | null
+}
+
+export interface MatriculaSlotInfo {
+  id: string
+  slot_id: string
+  ativo: boolean
+  turma_slots?: {
+    id: string
+    dia_semana: number
+    hora_inicio: string
+    vagas_total: number | null
+    turmas?: { id: string; nome: string; servico_id: string | null } | null
+  } | null
+}
+
+export async function salvarPlanoServicoAction(payload: {
+  id?: string
+  servico_id: string
+  nome: string
+  dias_semana: number
+  valor_mensal: number
+  ativo?: boolean
+}): Promise<{ success: true } | { error: string }> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { id, ...rest } = payload
+  let error
+  if (id) {
+    ;({ error } = await admin.from('planos_servico').update(rest).eq('id', id).eq('empresa_id', empresa_id))
+  } else {
+    ;({ error } = await admin.from('planos_servico').insert({ ...rest, empresa_id }))
+  }
+  if (error) return { error: error.message }
+  revalidatePath('/turmas')
+  return { success: true }
+}
+
+export async function excluirPlanoServicoAction(id: string): Promise<{ success: true } | { error: string }> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { error } = await admin.from('planos_servico').delete().eq('id', id).eq('empresa_id', empresa_id)
+  if (error) return { error: error.message }
+  revalidatePath('/turmas')
+  return { success: true }
+}
+
+export async function novaMatriculaAction(payload: {
+  paciente_id: string
+  plano_id: string
+  slot_ids: string[]
+  data_matricula: string
+  observacoes?: string | null
+}): Promise<{ success: true } | { error: string }> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  // 1. Verifica paciente ativo
+  const { data: paciente } = await admin.from('pacientes').select('status').eq('id', payload.paciente_id).eq('empresa_id', empresa_id).maybeSingle()
+  if (!paciente) return { error: 'Paciente não encontrado.' }
+  if (paciente.status !== 'ativo') return { error: 'Paciente inativo. Reative o cadastro para matricular.' }
+
+  // 2. Verifica plano ativo
+  const { data: plano } = await admin.from('planos_servico').select('id, servico_id, dias_semana, ativo').eq('id', payload.plano_id).eq('empresa_id', empresa_id).maybeSingle()
+  if (!plano) return { error: 'Plano não encontrado.' }
+  if (!plano.ativo) return { error: 'Plano inativo.' }
+
+  // 3. Verifica quantidade de slots
+  if (payload.slot_ids.length !== plano.dias_semana) {
+    return { error: `Este plano requer exatamente ${plano.dias_semana} slot(s) semanal(is). Você selecionou ${payload.slot_ids.length}.` }
+  }
+
+  // 4 & 5. Valida cada slot
+  for (const slot_id of payload.slot_ids) {
+    const { data: slot } = await admin
+      .from('turma_slots')
+      .select('id, vagas_total, turmas(servico_id)')
+      .eq('id', slot_id)
+      .maybeSingle()
+
+    if (!slot) return { error: `Slot ${slot_id} não encontrado.` }
+    const turmaServico = (slot.turmas as any)?.servico_id
+    if (turmaServico !== plano.servico_id) {
+      return { error: 'Um dos slots selecionados pertence a uma turma de serviço diferente do plano.' }
+    }
+
+    const vagasTotal = slot.vagas_total ?? 10
+    const { count } = await admin
+      .from('matricula_slots')
+      .select('id', { count: 'exact', head: true })
+      .eq('slot_id', slot_id)
+      .eq('ativo', true)
+    if ((count ?? 0) >= vagasTotal) {
+      return { error: `Slot sem vagas disponíveis. Escolha outro horário.` }
+    }
+  }
+
+  // 6. Insere matrícula
+  const { data: mat, error: e1 } = await admin
+    .from('matriculas')
+    .insert({
+      empresa_id,
+      paciente_id: payload.paciente_id,
+      plano_id: payload.plano_id,
+      data_matricula: payload.data_matricula,
+      status: 'ativo',
+      observacoes: payload.observacoes ?? null,
+    })
+    .select('id')
+    .single()
+  if (e1 || !mat) return { error: e1?.message ?? 'Erro ao criar matrícula.' }
+
+  // 7. Insere slots
+  const { error: e2 } = await admin.from('matricula_slots').insert(
+    payload.slot_ids.map(sid => ({ empresa_id, matricula_id: mat.id, slot_id: sid }))
+  )
+  if (e2) return { error: e2.message }
+
+  revalidatePath('/turmas')
+  return { success: true }
+}
+
+export async function encerrarMatriculaAction(id: string): Promise<{ success: true } | { error: string }> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { data: mat } = await admin.from('matriculas').select('status').eq('id', id).eq('empresa_id', empresa_id).maybeSingle()
+  if (!mat) return { error: 'Matrícula não encontrada.' }
+  if (mat.status === 'encerrado') return { error: 'MATRICULA_JA_ENCERRADA' }
+
+  const hoje = new Date().toISOString().slice(0, 10)
+  const { error: e1 } = await admin.from('matriculas').update({ status: 'encerrado', data_saida: hoje }).eq('id', id).eq('empresa_id', empresa_id)
+  if (e1) return { error: e1.message }
+
+  await admin.from('matricula_slots').update({ ativo: false }).eq('matricula_id', id).eq('empresa_id', empresa_id)
+
+  revalidatePath('/turmas')
+  return { success: true }
+}
+
+export async function pausarReativarMatriculaAction(
+  id: string,
+  status: 'ativo' | 'pausado',
+): Promise<{ success: true } | { error: string }> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { error } = await admin.from('matriculas').update({ status }).eq('id', id).eq('empresa_id', empresa_id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/turmas')
+  return { success: true }
+}
+
+export async function remanejamentoSlotAction(payload: {
+  matricula_id: string
+  slot_antigo_id: string
+  slot_novo_id: string
+}): Promise<{ success: true } | { error: string }> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  // 1. Busca matrícula + plano
+  const { data: mat } = await admin
+    .from('matriculas')
+    .select('status, plano_id, planos_servico(servico_id)')
+    .eq('id', payload.matricula_id)
+    .eq('empresa_id', empresa_id)
+    .maybeSingle()
+  if (!mat) return { error: 'Matrícula não encontrada.' }
+  if (mat.status !== 'ativo') return { error: 'Somente matrículas ativas podem ter slots remanejados.' }
+
+  const servicoId = (mat.planos_servico as any)?.servico_id
+
+  // 2. Valida novo slot
+  const { data: novoSlot } = await admin
+    .from('turma_slots')
+    .select('id, vagas_total, turmas(servico_id)')
+    .eq('id', payload.slot_novo_id)
+    .maybeSingle()
+  if (!novoSlot) return { error: 'Slot de destino não encontrado.' }
+
+  const novoServico = (novoSlot.turmas as any)?.servico_id
+  if (novoServico !== servicoId) return { error: 'O novo slot pertence a um serviço diferente do plano.' }
+
+  // 3. Verifica vagas
+  const vagasTotal = novoSlot.vagas_total ?? 10
+  const { count } = await admin
+    .from('matricula_slots')
+    .select('id', { count: 'exact', head: true })
+    .eq('slot_id', payload.slot_novo_id)
+    .eq('ativo', true)
+  if ((count ?? 0) >= vagasTotal) return { error: 'Slot de destino sem vagas disponíveis.' }
+
+  // Desativa slot antigo
+  await admin.from('matricula_slots').update({ ativo: false }).eq('matricula_id', payload.matricula_id).eq('slot_id', payload.slot_antigo_id).eq('empresa_id', empresa_id)
+
+  // Insere ou reativa slot novo
+  const { data: existing } = await admin.from('matricula_slots')
+    .select('id, ativo')
+    .eq('matricula_id', payload.matricula_id)
+    .eq('slot_id', payload.slot_novo_id)
+    .maybeSingle()
+
+  if (existing) {
+    await admin.from('matricula_slots').update({ ativo: true }).eq('id', existing.id)
+  } else {
+    const { error: eIns } = await admin.from('matricula_slots').insert({
+      empresa_id,
+      matricula_id: payload.matricula_id,
+      slot_id: payload.slot_novo_id,
+    })
+    if (eIns) return { error: eIns.message }
+  }
+
+  revalidatePath('/turmas')
+  return { success: true }
+}
+
+export async function criarRealocacaoAction(payload: {
+  matricula_id: string
+  paciente_id: string
+  sessao_origem_id?: string | null
+  slot_destino_id: string
+  observacoes?: string | null
+}): Promise<{ success: true } | { error: string }> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  // 1. Busca matrícula + plano
+  const { data: mat } = await admin
+    .from('matriculas')
+    .select('status, plano_id, planos_servico(servico_id)')
+    .eq('id', payload.matricula_id)
+    .eq('empresa_id', empresa_id)
+    .maybeSingle()
+  if (!mat) return { error: 'Matrícula não encontrada.' }
+
+  const servicoId = (mat.planos_servico as any)?.servico_id
+
+  // 2. Valida slot destino
+  const { data: slotDestino } = await admin
+    .from('turma_slots')
+    .select('id, vagas_total, turmas(servico_id)')
+    .eq('id', payload.slot_destino_id)
+    .maybeSingle()
+  if (!slotDestino) return { error: 'Slot de destino não encontrado.' }
+
+  const destinoServico = (slotDestino.turmas as any)?.servico_id
+  if (destinoServico !== servicoId) return { error: 'O slot de destino pertence a um serviço diferente do plano.' }
+
+  // 3. Verifica vagas
+  const vagasTotal = slotDestino.vagas_total ?? 10
+  const { count } = await admin
+    .from('matricula_slots')
+    .select('id', { count: 'exact', head: true })
+    .eq('slot_id', payload.slot_destino_id)
+    .eq('ativo', true)
+  if ((count ?? 0) >= vagasTotal) return { error: 'Slot de destino sem vagas disponíveis.' }
+
+  const { error } = await admin.from('realocacoes_aula').insert({
+    empresa_id,
+    matricula_id: payload.matricula_id,
+    paciente_id: payload.paciente_id,
+    sessao_origem_id: payload.sessao_origem_id ?? null,
+    slot_destino_id: payload.slot_destino_id,
+    status: 'pendente',
+    observacoes: payload.observacoes ?? null,
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath('/turmas')
+  return { success: true }
+}
+
+export async function cancelarRealocacaoAction(id: string): Promise<{ success: true } | { error: string }> {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { error } = await admin.from('realocacoes_aula').update({ status: 'cancelada' }).eq('id', id).eq('empresa_id', empresa_id)
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function listarSlotsComVagasAction(servico_id?: string): Promise<SlotComVagas[]> {
+  const ctx = await getContext()
+  if ('error' in ctx) return []
+  const { admin, empresa_id } = ctx
+
+  let query = admin
+    .from('turma_slots')
+    .select('id, turma_id, dia_semana, hora_inicio, hora_fim, duracao_minutos, vagas_total, ativo, turmas(id, nome, servico_id, nivel)')
+    .eq('empresa_id', empresa_id)
+    .eq('ativo', true)
+
+  if (servico_id) {
+    // filter by turmas.servico_id via join — fetch all then filter client side
+  }
+
+  const { data: slots } = await query
+
+  const result: SlotComVagas[] = []
+  for (const s of (slots ?? []) as any[]) {
+    if (servico_id && (s.turmas as any)?.servico_id !== servico_id) continue
+    const { count } = await admin
+      .from('matricula_slots')
+      .select('id', { count: 'exact', head: true })
+      .eq('slot_id', s.id)
+      .eq('ativo', true)
+    const vagasTotal = s.vagas_total ?? 10
+    result.push({
+      id: s.id,
+      turma_id: s.turma_id,
+      dia_semana: s.dia_semana,
+      hora_inicio: s.hora_inicio,
+      hora_fim: s.hora_fim,
+      duracao_minutos: s.duracao_minutos,
+      vagas_total: vagasTotal,
+      vagas_livres: Math.max(0, vagasTotal - (count ?? 0)),
+      ativo: s.ativo,
+      turmas: s.turmas,
+    })
+  }
+
+  return result
 }
 
 // ─── Cobrança mensal ─────────────────────────────────────────────────────────

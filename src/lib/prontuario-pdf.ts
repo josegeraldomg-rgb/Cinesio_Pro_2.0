@@ -539,6 +539,124 @@ export function gerarPDFProntuario(
 </html>`
 }
 
+// ─── Relatório de Evoluções ───────────────────────────────────────────────────
+
+export function gerarPDFEvolucoes(
+  empresa:   EmpresaPDF,
+  paciente:  PacientePDF,
+  evolucoes: RegistroPDF[],
+): string {
+  const dataHoje = formatarDataExtenso()
+
+  const rows = evolucoes.map(reg => {
+    const d = reg.dados
+    const dataHora = new Date(reg.criado_em).toLocaleDateString('pt-BR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    }) + ' às ' + new Date(reg.criado_em).toLocaleTimeString('pt-BR', {
+      hour: '2-digit', minute: '2-digit',
+    })
+
+    // conteúdo varia por tipo
+    let conteudo = ''
+    if (reg.tipo === 'evolucao') {
+      conteudo = `<div class="secao-conteudo">${String(d.conteudo ?? '').replace(/\n/g,'<br>')}</div>`
+    } else if (reg.tipo === 'copiloto') {
+      conteudo = `
+        ${d.queixa ? `<div class="campo-linha"><span class="campo-label">Queixa:</span><span class="campo-valor">${d.queixa}</span></div>` : ''}
+        ${d.anamnese ? `<div class="campo-linha" style="align-items:flex-start"><span class="campo-label">Anamnese:</span><span class="campo-valor">${String(d.anamnese).replace(/\n/g,'<br>')}</span></div>` : ''}
+        ${d.conduta ? `<div class="campo-linha" style="align-items:flex-start"><span class="campo-label">Conduta:</span><span class="campo-valor">${String(d.conduta).replace(/\n/g,'<br>')}</span></div>` : ''}
+        ${d.cid ? `<div class="campo-linha"><span class="campo-label">CID:</span><span class="campo-valor">${d.cid}</span></div>` : ''}
+        ${d.anotacoes ? `<div class="campo-linha" style="align-items:flex-start"><span class="campo-label">Anotações:</span><span class="campo-valor" style="color:#64748B;font-style:italic;">${String(d.anotacoes).replace(/\n/g,'<br>')}</span></div>` : ''}
+      `
+    }
+
+    const tipoLabel = reg.tipo === 'evolucao' ? 'Evolução Clínica' : 'Copiloto IA'
+    const tipoColor = reg.tipo === 'evolucao' ? '#1D4ED8' : '#BE185D'
+    const tipoBg    = reg.tipo === 'evolucao' ? '#DBEAFE'  : '#FCE7F3'
+
+    return `
+      <div style="margin-bottom:28px; padding:20px; border:1px solid #E2E8F0; border-radius:10px; page-break-inside:avoid;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="
+              font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
+              padding:3px 10px; border-radius:99px; background:${tipoBg}; color:${tipoColor};
+            ">${tipoLabel}</span>
+            ${reg.profissional_nome ? `<span style="font-size:12px; color:#64748B;">Prof. ${reg.profissional_nome}</span>` : ''}
+          </div>
+          <span style="font-size:12px; color:#64748B; font-weight:600;">${dataHora}</span>
+        </div>
+        ${conteudo}
+      </div>
+    `
+  }).join('')
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Evoluções Clínicas — ${paciente.nome}</title>
+  <style>${CSS_BASE}
+    .evo-count {
+      font-size: 12px;
+      color: #64748B;
+      margin-bottom: 20px;
+      padding: 8px 14px;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-left">
+      <h1>${empresa.nome}</h1>
+      <div class="subtitulo">RELATÓRIO DE EVOLUÇÕES CLÍNICAS</div>
+    </div>
+    <div class="header-right">${dataHoje}</div>
+  </div>
+
+  <div class="body">
+    <div class="doc-titulo">EVOLUÇÕES CLÍNICAS</div>
+
+    <div class="secao-titulo">Informações do Paciente</div>
+    <table class="tabela-paciente">
+      <tr>
+        <td><span class="label">Nome Completo:</span><span class="valor">${paciente.nome}</span></td>
+        <td><span class="label">CPF / Documento:</span><span class="valor">${paciente.cpf ?? '—'}</span></td>
+      </tr>
+      <tr>
+        <td>
+          <span class="label">Data de Nascimento:</span>
+          <span class="valor">${formatarDataBR(paciente.data_nascimento)}${paciente.data_nascimento ? ` (${calcularIdade(paciente.data_nascimento)})` : ''}</span>
+        </td>
+        <td>
+          <span class="label">Contato / Telefone:</span>
+          <span class="valor">${formatarTelefone(paciente.telefone)}</span>
+        </td>
+      </tr>
+    </table>
+
+    <div class="secao-titulo" style="margin-top:28px;">Registro de Evoluções</div>
+    <div class="evo-count">${evolucoes.length} evolução(ões) encontrada(s) — ordenadas da mais recente para a mais antiga</div>
+
+    <div style="margin-top:12px;">
+      ${rows || '<p style="color:#94A3B8; font-style:italic;">Nenhuma evolução registrada.</p>'}
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>CinesioPro — Sistema de Gestão Clínica</span>
+    <span>Gerado em ${dataHoje}</span>
+  </div>
+
+</body>
+</html>`
+}
+
 // ─── Abrir PDF em nova janela ─────────────────────────────────────────────────
 
 export function abrirPDF(html: string) {

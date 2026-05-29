@@ -30,7 +30,7 @@ function getCatalogData(empresaId: string) {
           .eq('empresa_id', empresaId),
         admin.from('servicos')
           .select('id, nome, tipo, duracao_minutos, valor, cor, icone, categoria_id')
-          .eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+          .eq('empresa_id', empresaId).eq('ativo', true).neq('modalidade', 'turma').order('nome'),
         admin.from('servico_profissional')
           .select('servico_id, profissional_id, valor_override, duracao_override')
           .eq('empresa_id', empresaId),

@@ -24,6 +24,7 @@ export interface Servico {
   icone: string | null
   ativo: boolean
   permite_agendamento_online: boolean
+  modalidade: 'individual' | 'turma'
 }
 
 export interface Categoria {

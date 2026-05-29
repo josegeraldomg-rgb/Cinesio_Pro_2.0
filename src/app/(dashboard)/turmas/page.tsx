@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getEmpresaId } from '@/lib/get-empresa-id'
 import { TurmasClient } from './turmas-client'
+import { listarSlotsComVagasAction } from './actions'
 
 const SELECT_SESSAO = `
   id, slot_id, turma_id, data_hora, duracao_minutos, status, observacoes,
@@ -35,6 +36,8 @@ export default async function TurmasPage() {
     { data: servicos },
     { data: pacientes },
     { data: sequencias },
+    { data: planosServicoRaw },
+    { data: novasMatriculasRaw },
   ] = await Promise.all([
     admin.from('turmas')
       .select('id, nome, descricao, profissional_id, sala_id, servico_id, nivel, capacidade_slot, data_inicio, data_fim, ativo, observacoes, profissionais(nome), salas(nome)')
@@ -66,12 +69,24 @@ export default async function TurmasPage() {
 
     admin.from('profissionais').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     admin.from('salas').select('id, nome').eq('empresa_id', empresaId),
-    admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).eq('modalidade', 'turma').order('nome'),
     admin.from('pacientes').select('id, nome, telefone').eq('empresa_id', empresaId).eq('status', 'ativo').order('nome'),
     admin.from('sequencias_aula').select('id, nome').eq('empresa_id', empresaId).order('nome'),
+
+    // Novo modelo
+    admin.from('planos_servico')
+      .select('id, servico_id, nome, dias_semana, valor_mensal, ativo, servicos(nome)')
+      .eq('empresa_id', empresaId)
+      .eq('ativo', true)
+      .order('nome'),
+
+    admin.from('matriculas')
+      .select('id, paciente_id, plano_id, data_matricula, data_saida, status, observacoes, pacientes(nome, telefone), planos_servico(nome, dias_semana, valor_mensal, servicos(nome))')
+      .eq('empresa_id', empresaId)
+      .order('criado_em', { ascending: false }),
   ])
 
-  // Montar slots_ids por matrícula
+  // Montar slots_ids por matrícula (modelo antigo)
   const slotsByMatricula: Record<string, string[]> = {}
   for (const ms of (matriculaSlots ?? [])) {
     if (!slotsByMatricula[ms.matricula_id]) slotsByMatricula[ms.matricula_id] = []
@@ -85,11 +100,37 @@ export default async function TurmasPage() {
     planos: (planosRaw ?? []).filter((p: any) => p.turma_id === t.id),
   }))
 
-  // Enriquecer matrículas com slots_ids
+  // Enriquecer matrículas (modelo antigo) com slots_ids
   const matriculas = (matriculasRaw ?? []).map((m: any) => ({
     ...m,
     slots_ids: slotsByMatricula[m.id] ?? [],
   }))
+
+  // Enriquecer novas matrículas com slots
+  const novasMatriculasIds = (novasMatriculasRaw ?? []).map((m: any) => m.id)
+  let matriculaSlotsPorId: Record<string, any[]> = {}
+
+  if (novasMatriculasIds.length > 0) {
+    const { data: mSlots } = await admin
+      .from('matricula_slots')
+      .select('id, matricula_id, slot_id, ativo, turma_slots(id, dia_semana, hora_inicio, vagas_total, turmas(id, nome, servico_id))')
+      .in('matricula_id', novasMatriculasIds)
+      .eq('empresa_id', empresaId)
+      .eq('ativo', true)
+
+    for (const ms of (mSlots ?? []) as any[]) {
+      if (!matriculaSlotsPorId[ms.matricula_id]) matriculaSlotsPorId[ms.matricula_id] = []
+      matriculaSlotsPorId[ms.matricula_id].push(ms)
+    }
+  }
+
+  const novasMatriculas = (novasMatriculasRaw ?? []).map((m: any) => ({
+    ...m,
+    slots: matriculaSlotsPorId[m.id] ?? [],
+  }))
+
+  // Slots com vagas (novo modelo)
+  const slotsComVagas = await listarSlotsComVagasAction()
 
   return (
     <TurmasClient
@@ -101,6 +142,9 @@ export default async function TurmasPage() {
       servicos={servicos ?? []}
       pacientes={pacientes ?? []}
       sequencias={(sequencias ?? []) as any}
+      planosServico={(planosServicoRaw ?? []) as any}
+      novasMatriculas={novasMatriculas as any}
+      slotsComVagas={slotsComVagas}
     />
   )
 }

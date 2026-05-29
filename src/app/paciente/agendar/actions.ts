@@ -95,7 +95,7 @@ export async function buscarDadosAgendarAction(): Promise<{
       .select(`
         id, nome, especialidade, avatar_url, cor_agenda,
         servico_profissional (
-          servicos ( id, nome, duracao_minutos, valor, tipo, ativo )
+          servicos ( id, nome, duracao_minutos, valor, tipo, ativo, modalidade )
         )
       `)
       .eq('empresa_id', empresa_id)
@@ -137,7 +137,7 @@ export async function buscarDadosAgendarAction(): Promise<{
   const profissionais: ProfissionalPortal[] = (profRaw ?? []).map((p) => {
     const servicos: ServicoPortal[] = ((p.servico_profissional as any[]) ?? [])
       .map((sp: any) => sp.servicos)
-      .filter((s: any) => s?.ativo)
+      .filter((s: any) => s?.ativo && s?.modalidade !== 'turma')
       .map((s: any) => ({
         id: s.id,
         nome: s.nome,

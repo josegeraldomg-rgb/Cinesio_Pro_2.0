@@ -18,6 +18,7 @@ export interface UsuarioRow {
   perfil: string
   ativo: boolean | null
   created_at: string | null
+  avatar_url?: string | null
 }
 
 export interface ServicoResumo {

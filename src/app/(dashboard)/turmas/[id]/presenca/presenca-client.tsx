@@ -37,7 +37,7 @@ export function PresencaClient(props: Props) {
   )
 
   const [evolucaoPadrao, setEvolucaoPadrao] = useState(props.sessaoAtual.evolucao_padrao ?? '')
-  const [sequenciaId, setSequenciaId] = useState<string | null>(props.sessaoAtual.sequencia_id)
+  const [sequenciaIds, setSequenciaIds] = useState<string[]>(props.sessaoAtual.sequencias_ids)
   const [sequencias, setSequencias] = useState<Sequencia[]>(props.sequencias)
   const [seqModalAberto, setSeqModalAberto] = useState(false)
 
@@ -108,7 +108,8 @@ export function PresencaClient(props: Props) {
         turma_id: props.sessaoAtual.turma_id,
         profissional_id: props.sessaoAtual.profissional_id,
         evolucao_padrao: evolucaoPadrao,
-        sequencia_id: sequenciaId,
+        sequencia_id: sequenciaIds[0] ?? null,
+        sequencias_ids: sequenciaIds,
         presencas: alunos.map(a => ({
           paciente_id: a.paciente_id,
           status: a.status,
@@ -132,7 +133,14 @@ export function PresencaClient(props: Props) {
     }
   }
 
-  const sequenciaAtual = sequencias.find(s => s.id === sequenciaId)
+  const sequenciasSelecionadas = sequencias.filter(s => sequenciaIds.includes(s.id))
+
+  function toggleSequencia(id: string) {
+    setSequenciaIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
   const todosPresentes = alunos.length > 0 && alunos.every(a => a.status === 'presente')
   const presenteCount = alunos.filter(a => a.status === 'presente').length
   const faltouCount = alunos.filter(a => a.status === 'faltou').length
@@ -236,49 +244,86 @@ export function PresencaClient(props: Props) {
           </div>
 
           <div className="flex-1 overflow-auto p-4 space-y-5">
-            {/* Seletor de sequência */}
+            {/* Seletor de sequências (multi-seleção) */}
             <div>
-              <label className="text-xs font-medium text-[#7F8C8D] uppercase tracking-wide mb-1.5 block">
-                Sequência de Exercícios
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <select
-                    disabled={props.travada}
-                    className="w-full appearance-none bg-white border border-[#E8E8E8] rounded-lg px-3 py-2 pr-8 text-sm text-[#2C3E50] focus:outline-none focus:ring-2 focus:ring-[#4A3AE8]/30 disabled:opacity-60"
-                    value={sequenciaId ?? ''}
-                    onChange={e => setSequenciaId(e.target.value || null)}
-                  >
-                    <option value="">Nenhuma</option>
-                    {sequencias.map(s => (
-                      <option key={s.id} value={s.id}>{s.nome}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#7F8C8D] pointer-events-none" />
-                </div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-medium text-[#7F8C8D] uppercase tracking-wide">
+                  Sequências de Exercícios
+                  {sequenciaIds.length > 0 && (
+                    <span className="ml-1.5 px-1.5 py-0.5 bg-[#4A3AE8] text-white rounded-full text-[10px] font-bold">
+                      {sequenciaIds.length}
+                    </span>
+                  )}
+                </label>
                 <button
                   onClick={() => setSeqModalAberto(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-[#F8F9FA] border border-[#E8E8E8] rounded-lg text-xs font-medium text-[#2C3E50] hover:bg-[#EDF0F2] transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 bg-[#F8F9FA] border border-[#E8E8E8] rounded-lg text-xs font-medium text-[#2C3E50] hover:bg-[#EDF0F2] transition-colors"
                 >
-                  <BookOpen size={13} />
+                  <BookOpen size={12} />
                   Biblioteca
                 </button>
               </div>
 
-              {/* Preview dos exercícios da sequência */}
-              {sequenciaAtual && sequenciaAtual.exercicios.length > 0 && (
-                <div className="mt-2 p-3 bg-[#F8F9FA] rounded-lg space-y-1">
-                  {sequenciaAtual.exercicios.map((ex, i) => (
-                    <div key={i} className="text-xs text-[#2C3E50] flex gap-2">
-                      <span className="text-[#7F8C8D] w-4">{i + 1}.</span>
-                      <span className="font-medium">{ex.nome_exercicio}</span>
-                      {(ex.series || ex.repeticoes) && (
-                        <span className="text-[#7F8C8D]">
-                          {ex.series ? `${ex.series}x` : ''}{ex.repeticoes ? ex.repeticoes : ''}
-                          {ex.carga ? ` · ${ex.carga}` : ''}
+              {/* Lista de sequências como checkboxes */}
+              {sequencias.length === 0 ? (
+                <p className="text-xs text-[#7F8C8D] italic">Nenhuma sequência cadastrada. Use a Biblioteca para criar.</p>
+              ) : (
+                <div className="border border-[#E8E8E8] rounded-lg overflow-hidden">
+                  {sequencias.map((s, i) => {
+                    const selecionada = sequenciaIds.includes(s.id)
+                    return (
+                      <button
+                        key={s.id}
+                        disabled={props.travada}
+                        onClick={() => toggleSequencia(s.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors disabled:opacity-60 ${
+                          i > 0 ? 'border-t border-[#F0F0F0]' : ''
+                        } ${selecionada ? 'bg-[#4A3AE8]/5' : 'bg-white hover:bg-[#F8F9FA]'}`}
+                      >
+                        <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
+                          selecionada ? 'bg-[#4A3AE8] border-[#4A3AE8]' : 'border-[#D1D5DB]'
+                        }`}>
+                          {selecionada && (
+                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                              <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </div>
+                        <span className={`text-sm flex-1 ${selecionada ? 'font-semibold text-[#2C3E50]' : 'text-[#4B5563]'}`}>
+                          {s.nome}
                         </span>
-                      )}
-                    </div>
+                        {s.exercicios.length > 0 && (
+                          <span className="text-xs text-[#9CA3AF]">{s.exercicios.length} ex.</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Preview dos exercícios das sequências selecionadas */}
+              {sequenciasSelecionadas.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {sequenciasSelecionadas.map(seq => (
+                    seq.exercicios.length > 0 && (
+                      <div key={seq.id} className="p-3 bg-[#F8F9FA] rounded-lg">
+                        <p className="text-[10px] font-bold text-[#4A3AE8] uppercase tracking-wide mb-1.5">{seq.nome}</p>
+                        <div className="space-y-1">
+                          {seq.exercicios.map((ex, i) => (
+                            <div key={i} className="text-xs text-[#2C3E50] flex gap-2">
+                              <span className="text-[#7F8C8D] w-4">{i + 1}.</span>
+                              <span className="font-medium">{ex.nome_exercicio}</span>
+                              {(ex.series || ex.repeticoes) && (
+                                <span className="text-[#7F8C8D]">
+                                  {ex.series ? `${ex.series}x` : ''}{ex.repeticoes ?? ''}
+                                  {ex.carga ? ` · ${ex.carga}` : ''}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
                   ))}
                 </div>
               )}

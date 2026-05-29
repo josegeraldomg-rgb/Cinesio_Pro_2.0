@@ -13,9 +13,10 @@ interface Props {
   userName:    string
   userEmail:   string
   empresaNome: string
+  userFoto?:   string | null
 }
 
-export function SidebarProvider({ children, userName, userEmail, empresaNome }: Props) {
+export function SidebarProvider({ children, userName, userEmail, empresaNome, userFoto }: Props) {
   const [pinned,  setPinned]  = useState(false)
   const [hovered, setHovered] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -52,6 +53,7 @@ export function SidebarProvider({ children, userName, userEmail, empresaNome }: 
         userName={userName}
         userEmail={userEmail}
         empresaNome={empresaNome}
+        userFoto={userFoto}
         expanded={isExpanded}
         pinned={pinned}
         onHoverChange={setHovered}

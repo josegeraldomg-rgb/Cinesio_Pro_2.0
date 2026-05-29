@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useMemo, useTransition } from 'react'
-import { Plus, Users, Calendar, BookOpen, DollarSign, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Search, Pencil, Trash2, FileText } from 'lucide-react'
-import type { Turma, Matricula, TurmaSessao } from './actions'
-import { atualizarStatusMatriculaAction, cancelarSessaoAction, gerarCobrancasMensaisAction, inativarTurmaAction } from './actions'
+import { Plus, Users, Calendar, BookOpen, DollarSign, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Search, Pencil, Trash2, FileText, ArrowLeftRight, RefreshCw, AlertCircle } from 'lucide-react'
+import type { Turma, Matricula, TurmaSessao, PlanoServico, NovaMatricula, SlotComVagas } from './actions'
+import { atualizarStatusMatriculaAction, cancelarSessaoAction, gerarCobrancasMensaisAction, inativarTurmaAction, salvarPlanoServicoAction, excluirPlanoServicoAction, encerrarMatriculaAction, pausarReativarMatriculaAction } from './actions'
 import { TurmaFormModal } from '@/components/turmas/turma-form-modal'
 import { MatriculaModal } from '@/components/turmas/matricula-modal'
 import { EditarTurmaModal } from '@/components/turmas/editar-turma-modal'
+import { NovaMatriculaModal } from '@/components/turmas/nova-matricula-modal'
+import { RemanejamentoModal } from '@/components/turmas/remanejamento-modal'
+import { RealocacaoModal } from '@/components/turmas/realocacao-modal'
 import Link from 'next/link'
 import { gerarPdfTurma } from '@/lib/turma-pdf'
 
@@ -22,6 +25,12 @@ const STATUS_SESSAO: Record<string, { label: string; cor: string; bg: string; Ic
   cancelada: { label: 'Cancelada', cor: '#E74C3C', bg: '#E74C3C15', Icon: XCircle },
 }
 
+const STATUS_MAT: Record<string, { label: string; cor: string; bg: string }> = {
+  ativo:     { label: 'Ativo',     cor: '#27AE60', bg: '#27AE6015' },
+  pausado:   { label: 'Pausado',   cor: '#E67E22', bg: '#E67E2215' },
+  encerrado: { label: 'Encerrado', cor: '#E74C3C', bg: '#E74C3C15' },
+}
+
 function fmtDataHora(s: string) {
   const d = new Date(s)
   return { data: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), hora: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), dia: DIAS[d.getDay()] }
@@ -33,7 +42,6 @@ interface Profissional { id: string; nome: string }
 interface Sala { id: string; nome: string }
 interface Servico { id: string; nome: string }
 interface Paciente { id: string; nome: string; telefone: string | null }
-
 interface Sequencia { id: string; nome: string }
 
 interface Props {
@@ -45,20 +53,29 @@ interface Props {
   servicos: Servico[]
   pacientes: Paciente[]
   sequencias?: Sequencia[]
+  planosServico: PlanoServico[]
+  novasMatriculas: NovaMatricula[]
+  slotsComVagas: SlotComVagas[]
 }
 
 type Tab = 'turmas' | 'sessoes' | 'matriculas'
 
-// ─── Aba Turmas ───────────────────────────────────────────────────────────────
+// ─── Aba Turmas (com seção Planos de Serviço) ─────────────────────────────────
 
-function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacientes, sequencias, onAtualizar }: {
-  turmas: Turma[], matriculas: Matricula[], profissionais: Profissional[], salas: Sala[], servicos: Servico[], pacientes: Paciente[], sequencias?: Sequencia[], onAtualizar: () => void
+function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacientes, sequencias, planosServico, onAtualizar }: {
+  turmas: Turma[], matriculas: Matricula[], profissionais: Profissional[], salas: Sala[], servicos: Servico[], pacientes: Paciente[], sequencias?: Sequencia[], planosServico: PlanoServico[], onAtualizar: () => void
 }) {
   const [modalCriar, setModalCriar] = useState(false)
   const [editarTurma, setEditarTurma] = useState<Turma | null>(null)
   const [matriculaInfo, setMatriculaInfo] = useState<{ turma: Turma } | null>(null)
   const [toast, setToast] = useState('')
   const [, startT] = useTransition()
+
+  // Planos de serviço state
+  const [mostrarPlanos, setMostrarPlanos] = useState(false)
+  const [editandoPlano, setEditandoPlano] = useState<Partial<PlanoServico> | null>(null)
+  const [savingPlano, setSavingPlano] = useState(false)
+  const [errPlano, setErrPlano] = useState('')
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 4000) }
 
@@ -72,8 +89,157 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
     })
   }
 
+  async function salvarPlano() {
+    if (!editandoPlano?.nome || !editandoPlano?.servico_id || !editandoPlano?.dias_semana) {
+      setErrPlano('Preencha nome, serviço e dias por semana.')
+      return
+    }
+    setSavingPlano(true)
+    setErrPlano('')
+    const r = await salvarPlanoServicoAction({
+      id: editandoPlano.id,
+      servico_id: editandoPlano.servico_id,
+      nome: editandoPlano.nome,
+      dias_semana: editandoPlano.dias_semana,
+      valor_mensal: editandoPlano.valor_mensal ?? 0,
+      ativo: editandoPlano.ativo ?? true,
+    })
+    setSavingPlano(false)
+    if ('error' in r) { setErrPlano(r.error); return }
+    setEditandoPlano(null)
+    showToast(editandoPlano.id ? 'Plano atualizado.' : 'Plano criado.')
+    onAtualizar()
+  }
+
+  function excluirPlano(id: string) {
+    if (!confirm('Excluir este plano de serviço?')) return
+    startT(async () => {
+      const r = await excluirPlanoServicoAction(id)
+      if ('error' in r) { alert(r.error); return }
+      showToast('Plano excluído.')
+      onAtualizar()
+    })
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Seção Planos de Serviço */}
+      <div className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm overflow-hidden">
+        <button
+          onClick={() => setMostrarPlanos(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#F8F9FA] transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <BookOpen size={16} className="text-[#4A3AE8]" />
+            <span className="font-semibold text-[#2C3E50] text-sm">Planos de Serviço</span>
+            <span className="text-[11px] bg-[#4A3AE8]/10 text-[#4A3AE8] px-2 py-0.5 rounded-full font-semibold">
+              {planosServico.length}
+            </span>
+          </div>
+          {mostrarPlanos ? <ChevronUp size={16} className="text-[#7F8C8D]" /> : <ChevronDown size={16} className="text-[#7F8C8D]" />}
+        </button>
+
+        {mostrarPlanos && (
+          <div className="border-t border-[#E8E8E8] px-5 py-4 space-y-4">
+            {planosServico.length === 0 ? (
+              <p className="text-sm text-[#7F8C8D] py-2">Nenhum plano de serviço cadastrado.</p>
+            ) : (
+              <div className="space-y-2">
+                {planosServico.map(p => (
+                  <div key={p.id} className="flex items-center justify-between bg-[#F8F9FA] rounded-xl px-4 py-3">
+                    <div>
+                      <p className="font-semibold text-sm text-[#2C3E50]">{p.nome}</p>
+                      <p className="text-xs text-[#7F8C8D]">
+                        {p.servicos?.nome ?? 'Serviço'} · {p.dias_semana}x/semana · R$ {p.valor_mensal.toFixed(2)}/mês
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => setEditandoPlano(p)}
+                        className="h-7 w-7 rounded-lg border border-[#E8E8E8] flex items-center justify-center text-[#7F8C8D] hover:text-[#4A3AE8] hover:border-[#4A3AE8]/30 transition-colors">
+                        <Pencil size={12} />
+                      </button>
+                      <button onClick={() => excluirPlano(p.id)}
+                        className="h-7 w-7 rounded-lg border border-[#E8E8E8] flex items-center justify-center text-[#7F8C8D] hover:text-[#E74C3C] hover:border-[#E74C3C]/30 transition-colors">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {editandoPlano ? (
+              <div className="bg-[#4A3AE8]/5 border border-[#4A3AE8]/20 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-[#4A3AE8]">{editandoPlano.id ? 'Editar Plano' : 'Novo Plano'}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs text-[#7F8C8D] mb-1">Nome do plano *</label>
+                    <input
+                      value={editandoPlano.nome ?? ''}
+                      onChange={e => setEditandoPlano(prev => ({ ...prev!, nome: e.target.value }))}
+                      placeholder="Ex: Plano 2x Pilates"
+                      className="w-full h-9 px-3 border border-[#E8E8E8] rounded-lg text-sm outline-none focus:border-[#4A3AE8]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[#7F8C8D] mb-1">Serviço *</label>
+                    <select
+                      value={editandoPlano.servico_id ?? ''}
+                      onChange={e => setEditandoPlano(prev => ({ ...prev!, servico_id: e.target.value }))}
+                      className="w-full h-9 px-3 border border-[#E8E8E8] rounded-lg text-sm outline-none focus:border-[#4A3AE8] bg-white"
+                    >
+                      <option value="">Selecionar…</option>
+                      {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[#7F8C8D] mb-1">Dias/semana *</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={7}
+                      value={editandoPlano.dias_semana ?? ''}
+                      onChange={e => setEditandoPlano(prev => ({ ...prev!, dias_semana: Number(e.target.value) }))}
+                      className="w-full h-9 px-3 border border-[#E8E8E8] rounded-lg text-sm outline-none focus:border-[#4A3AE8]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[#7F8C8D] mb-1">Valor mensal (R$)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={editandoPlano.valor_mensal ?? 0}
+                      onChange={e => setEditandoPlano(prev => ({ ...prev!, valor_mensal: Number(e.target.value) }))}
+                      className="w-full h-9 px-3 border border-[#E8E8E8] rounded-lg text-sm outline-none focus:border-[#4A3AE8]"
+                    />
+                  </div>
+                </div>
+                {errPlano && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{errPlano}</p>}
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditandoPlano(null); setErrPlano('') }}
+                    className="h-9 px-4 rounded-lg border border-[#E8E8E8] text-sm text-[#7F8C8D] hover:text-[#2C3E50]">
+                    Cancelar
+                  </button>
+                  <button onClick={salvarPlano} disabled={savingPlano}
+                    className="h-9 px-5 rounded-lg bg-[#4A3AE8] text-white text-sm font-semibold hover:bg-[#3D2ED6] disabled:opacity-50">
+                    {savingPlano ? 'Salvando…' : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditandoPlano({ ativo: true, valor_mensal: 0, dias_semana: 2 })}
+                className="flex items-center gap-2 h-9 px-4 rounded-xl border border-dashed border-[#4A3AE8]/40 text-[#4A3AE8] text-sm font-medium hover:bg-[#4A3AE8]/5 transition-colors w-full justify-center"
+              >
+                <Plus size={14} /> Novo Plano de Serviço
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Lista de Turmas */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-[#7F8C8D]">{turmas.length} turma(s) ativa(s)</p>
         <button onClick={() => setModalCriar(true)} className="flex items-center gap-2 h-9 px-4 rounded-xl bg-[#4A3AE8] text-white text-sm font-semibold hover:bg-[#3D2ED6] shadow-sm">
@@ -262,7 +428,6 @@ function AbaSessoes({ sessoes, matriculas, onAtualizar }: { sessoes: TurmaSessao
               const cfg = STATUS_SESSAO[s.status]
               const Icon = cfg.Icon
               const alunos = getAlunosDoSlot(s)
-              const passado = new Date(s.data_hora) <= new Date()
               return (
                 <div key={s.id} className="flex items-center gap-4 px-5 py-3 hover:bg-[#F8F9FA] transition-colors">
                   <div className="w-14 text-center flex-shrink-0">
@@ -300,19 +465,50 @@ function AbaSessoes({ sessoes, matriculas, onAtualizar }: { sessoes: TurmaSessao
           </div>
         )}
       </div>
-
     </div>
   )
 }
 
 // ─── Aba Matrículas ───────────────────────────────────────────────────────────
 
-function AbaMatriculas({ matriculas, onAtualizar }: { matriculas: Matricula[]; onAtualizar: () => void }) {
+function AbaMatriculas({
+  matriculas,
+  novasMatriculas,
+  slotsComVagas,
+  pacientes,
+  planosServico,
+  onAtualizar,
+}: {
+  matriculas: Matricula[]
+  novasMatriculas: NovaMatricula[]
+  slotsComVagas: SlotComVagas[]
+  pacientes: { id: string; nome: string; telefone: string | null }[]
+  planosServico: PlanoServico[]
+  onAtualizar: () => void
+}) {
   const [busca, setBusca]     = useState('')
   const [filtroStatus, setFiltro] = useState('ativo')
+  const [modeloFiltro, setModeloFiltro] = useState<'todos' | 'novo' | 'antigo'>('todos')
+  const [novaMatriculaModal, setNovaMatriculaModal] = useState(false)
+  const [remanejandoMat, setRemanejandoMat] = useState<NovaMatricula | null>(null)
+  const [realocandoMat, setRealocandoMat] = useState<NovaMatricula | null>(null)
   const [, startT] = useTransition()
 
-  const filtradas = useMemo(() => {
+  // Filter novas matriculas
+  const novasFiltradas = useMemo(() => {
+    const q = busca.toLowerCase()
+    return novasMatriculas.filter(m => {
+      if (filtroStatus !== 'todos' && m.status !== filtroStatus) return false
+      if (q) {
+        const hay = `${m.pacientes?.nome ?? ''} ${m.planos_servico?.nome ?? ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [novasMatriculas, busca, filtroStatus])
+
+  // Filter old matriculas
+  const antigasFiltradas = useMemo(() => {
     const q = busca.toLowerCase()
     return matriculas.filter(m => {
       if (filtroStatus !== 'todos' && m.status !== filtroStatus) return false
@@ -324,24 +520,38 @@ function AbaMatriculas({ matriculas, onAtualizar }: { matriculas: Matricula[]; o
     })
   }, [matriculas, busca, filtroStatus])
 
-  function atualizarStatus(id: string, status: 'ativo' | 'pausado' | 'encerrado') {
+  function atualizarStatusAntigo(id: string, status: 'ativo' | 'pausado' | 'encerrado') {
     const label = status === 'ativo' ? 'reativar' : status === 'pausado' ? 'pausar' : 'encerrar'
     if (!confirm(`Deseja ${label} esta matrícula?`)) return
     startT(async () => { await atualizarStatusMatriculaAction(id, status); onAtualizar() })
   }
 
-  const STATUS_MAT: Record<string, { label: string; cor: string; bg: string }> = {
-    ativo:     { label: 'Ativo',     cor: '#27AE60', bg: '#27AE6015' },
-    pausado:   { label: 'Pausado',   cor: '#E67E22', bg: '#E67E2215' },
-    encerrado: { label: 'Encerrado', cor: '#E74C3C', bg: '#E74C3C15' },
+  function encerrarNova(id: string) {
+    if (!confirm('Encerrar esta matrícula?')) return
+    startT(async () => {
+      const r = await encerrarMatriculaAction(id)
+      if ('error' in r && r.error !== 'MATRICULA_JA_ENCERRADA') { alert(r.error); return }
+      onAtualizar()
+    })
   }
+
+  function pausarReativarNova(id: string, status: 'ativo' | 'pausado') {
+    const label = status === 'ativo' ? 'reativar' : 'pausar'
+    if (!confirm(`Deseja ${label} esta matrícula?`)) return
+    startT(async () => {
+      await pausarReativarMatriculaAction(id, status)
+      onAtualizar()
+    })
+  }
+
+  const totalAtivas = novasMatriculas.filter(m => m.status === 'ativo').length + matriculas.filter(m => m.status === 'ativo').length
 
   return (
     <div className="space-y-4">
       <div className="bg-white border border-[#E8E8E8] rounded-2xl p-3 flex items-center gap-3 flex-wrap shadow-sm">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7F8C8D]" />
-          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar aluno ou turma…"
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar aluno ou turma/plano…"
             className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#F8F9FA] text-sm outline-none" />
         </div>
         <div className="inline-flex bg-[#F8F9FA] rounded-lg p-0.5">
@@ -352,50 +562,195 @@ function AbaMatriculas({ matriculas, onAtualizar }: { matriculas: Matricula[]; o
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setNovaMatriculaModal(true)}
+          className="flex items-center gap-2 h-9 px-4 rounded-xl bg-[#4A3AE8] text-white text-xs font-semibold hover:bg-[#3D2ED6] shadow-sm flex-shrink-0"
+        >
+          <Plus size={14} /> Nova Matrícula
+        </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm overflow-hidden">
-        {filtradas.length === 0 ? (
-          <div className="py-16 text-center text-[#7F8C8D] text-sm">
-            <Users size={32} className="mx-auto mb-2 opacity-20" />
-            Nenhuma matrícula encontrada
-          </div>
-        ) : (
-          <div className="divide-y divide-[#F0F0F0]">
-            {filtradas.map(m => {
-              const cfg = STATUS_MAT[m.status] ?? STATUS_MAT.ativo
-              return (
-                <div key={m.id} className="flex items-center gap-4 px-5 py-3 hover:bg-[#F8F9FA] transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-[#2C3E50] truncate">{m.pacientes?.nome}</p>
-                    <p className="text-xs text-[#7F8C8D]">{m.turmas?.nome} · {m.turma_planos?.nome ?? 'Sem plano'}</p>
-                    <p className="text-[11px] text-[#7F8C8D]">Desde {new Date(m.data_matricula + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
-                  </div>
-                  {m.turma_planos?.valor_mensal && (
-                    <p className="text-sm font-semibold text-[#27AE60] flex-shrink-0">
-                      R$ {m.turma_planos.valor_mensal.toFixed(2)}/mês
-                    </p>
-                  )}
-                  <span className="text-[11px] font-semibold px-2 py-1 rounded-full flex-shrink-0"
-                    style={{ color: cfg.cor, background: cfg.bg }}>{cfg.label}</span>
-                  <div className="flex gap-1.5 flex-shrink-0">
-                    {m.status !== 'ativo'    && <button onClick={() => atualizarStatus(m.id, 'ativo')}     className="h-7 px-2.5 rounded-lg bg-[#27AE60]/10 text-[#27AE60] text-[11px] font-semibold">Reativar</button>}
-                    {m.status === 'ativo'    && <button onClick={() => atualizarStatus(m.id, 'pausado')}   className="h-7 px-2.5 rounded-lg bg-[#E67E22]/10 text-[#E67E22] text-[11px] font-semibold">Pausar</button>}
-                    {m.status !== 'encerrado'&& <button onClick={() => atualizarStatus(m.id, 'encerrado')} className="h-7 px-2.5 rounded-lg bg-[#E74C3C]/10 text-[#E74C3C] text-[11px] font-semibold">Encerrar</button>}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+      {/* Modelo switcher */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[#7F8C8D]">Mostrar:</span>
+        <div className="inline-flex bg-[#F8F9FA] rounded-lg p-0.5">
+          {([['todos', 'Todos'], ['novo', 'Novo modelo'], ['antigo', 'Legado']] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setModeloFiltro(v)}
+              className={`px-3 h-7 text-[11px] font-semibold rounded-md transition-colors ${modeloFiltro === v ? 'bg-white text-[#2C3E50] shadow-sm' : 'text-[#7F8C8D]'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-[#7F8C8D] ml-auto">{totalAtivas} ativa(s)</span>
       </div>
+
+      {/* Novo modelo */}
+      {(modeloFiltro === 'todos' || modeloFiltro === 'novo') && (
+        <div className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#F0F0F0] bg-[#4A3AE8]/3 flex items-center gap-2">
+            <span className="text-xs font-bold text-[#4A3AE8] uppercase tracking-wider">Novo Modelo — Plano de Serviço</span>
+            <span className="text-[11px] bg-[#4A3AE8]/10 text-[#4A3AE8] px-2 py-0.5 rounded-full">{novasFiltradas.length}</span>
+          </div>
+          {novasFiltradas.length === 0 ? (
+            <div className="py-10 text-center text-[#7F8C8D] text-sm">
+              <Users size={28} className="mx-auto mb-2 opacity-20" />
+              Nenhuma matrícula encontrada
+            </div>
+          ) : (
+            <div className="divide-y divide-[#F0F0F0]">
+              {novasFiltradas.map(m => {
+                const cfg = STATUS_MAT[m.status] ?? STATUS_MAT.ativo
+                const slotsAtivos = (m.slots ?? []).filter(s => s.ativo)
+                return (
+                  <div key={m.id} className="px-5 py-3 hover:bg-[#F8F9FA] transition-colors">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-sm text-[#2C3E50]">{m.pacientes?.nome}</p>
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: cfg.cor, background: cfg.bg }}>{cfg.label}</span>
+                        </div>
+                        <p className="text-xs text-[#7F8C8D] mt-0.5">
+                          {m.planos_servico?.nome ?? 'Plano'} · {m.planos_servico?.servicos?.nome ?? 'Serviço'}
+                        </p>
+                        {slotsAtivos.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {slotsAtivos.map(s => (
+                              <span key={s.id} className="text-[11px] bg-[#F0F0F0] text-[#7F8C8D] px-2 py-0.5 rounded-md">
+                                {s.turma_slots?.turmas?.nome ?? '?'} — {DIAS[s.turma_slots?.dia_semana ?? 0]} {s.turma_slots?.hora_inicio ?? ''}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-[11px] text-[#7F8C8D] mt-1">
+                          Desde {new Date(m.data_matricula + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        {m.planos_servico?.valor_mensal != null && (
+                          <p className="text-sm font-bold text-[#27AE60]">R$ {m.planos_servico.valor_mensal.toFixed(2)}/mês</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {m.status === 'ativo' && (
+                        <>
+                          <button onClick={() => setRemanejandoMat(m)}
+                            className="h-7 px-2.5 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] text-[11px] font-semibold flex items-center gap-1 hover:bg-[#4A3AE8]/20">
+                            <ArrowLeftRight size={11} /> Remanejar
+                          </button>
+                          <button onClick={() => setRealocandoMat(m)}
+                            className="h-7 px-2.5 rounded-lg bg-[#E67E22]/10 text-[#E67E22] text-[11px] font-semibold flex items-center gap-1 hover:bg-[#E67E22]/20">
+                            <RefreshCw size={11} /> Realocar
+                          </button>
+                          <button onClick={() => pausarReativarNova(m.id, 'pausado')}
+                            className="h-7 px-2.5 rounded-lg bg-[#E67E22]/10 text-[#E67E22] text-[11px] font-semibold">
+                            Pausar
+                          </button>
+                        </>
+                      )}
+                      {m.status === 'pausado' && (
+                        <button onClick={() => pausarReativarNova(m.id, 'ativo')}
+                          className="h-7 px-2.5 rounded-lg bg-[#27AE60]/10 text-[#27AE60] text-[11px] font-semibold">
+                          Reativar
+                        </button>
+                      )}
+                      {m.status !== 'encerrado' && (
+                        <button onClick={() => encerrarNova(m.id)}
+                          className="h-7 px-2.5 rounded-lg bg-[#E74C3C]/10 text-[#E74C3C] text-[11px] font-semibold">
+                          Encerrar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modelo antigo (legado) */}
+      {(modeloFiltro === 'todos' || modeloFiltro === 'antigo') && (
+        <div className="bg-white rounded-2xl border border-[#E8E8E8] shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#F0F0F0] bg-[#F8F9FA] flex items-center gap-2">
+            <span className="text-xs font-bold text-[#7F8C8D] uppercase tracking-wider">Legado — Matrícula por Turma</span>
+            <span className="text-[11px] bg-[#E8E8E8] text-[#7F8C8D] px-2 py-0.5 rounded-full">{antigasFiltradas.length}</span>
+          </div>
+          {antigasFiltradas.length === 0 ? (
+            <div className="py-10 text-center text-[#7F8C8D] text-sm">
+              <Users size={28} className="mx-auto mb-2 opacity-20" />
+              Nenhuma matrícula encontrada
+            </div>
+          ) : (
+            <div className="divide-y divide-[#F0F0F0]">
+              {antigasFiltradas.map(m => {
+                const cfg = STATUS_MAT[m.status] ?? STATUS_MAT.ativo
+                return (
+                  <div key={m.id} className="flex items-center gap-4 px-5 py-3 hover:bg-[#F8F9FA] transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-[#2C3E50] truncate">{m.pacientes?.nome}</p>
+                      <p className="text-xs text-[#7F8C8D]">{m.turmas?.nome} · {m.turma_planos?.nome ?? 'Sem plano'}</p>
+                      <p className="text-[11px] text-[#7F8C8D]">Desde {new Date(m.data_matricula + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    {m.turma_planos?.valor_mensal && (
+                      <p className="text-sm font-semibold text-[#27AE60] flex-shrink-0">
+                        R$ {m.turma_planos.valor_mensal.toFixed(2)}/mês
+                      </p>
+                    )}
+                    <span className="text-[11px] font-semibold px-2 py-1 rounded-full flex-shrink-0"
+                      style={{ color: cfg.cor, background: cfg.bg }}>{cfg.label}</span>
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      {m.status !== 'ativo'    && <button onClick={() => atualizarStatusAntigo(m.id, 'ativo')}     className="h-7 px-2.5 rounded-lg bg-[#27AE60]/10 text-[#27AE60] text-[11px] font-semibold">Reativar</button>}
+                      {m.status === 'ativo'    && <button onClick={() => atualizarStatusAntigo(m.id, 'pausado')}   className="h-7 px-2.5 rounded-lg bg-[#E67E22]/10 text-[#E67E22] text-[11px] font-semibold">Pausar</button>}
+                      {m.status !== 'encerrado'&& <button onClick={() => atualizarStatusAntigo(m.id, 'encerrado')} className="h-7 px-2.5 rounded-lg bg-[#E74C3C]/10 text-[#E74C3C] text-[11px] font-semibold">Encerrar</button>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modals */}
+      {novaMatriculaModal && (
+        <NovaMatriculaModal
+          pacientes={pacientes}
+          planosServico={planosServico}
+          slotsComVagas={slotsComVagas}
+          onClose={() => setNovaMatriculaModal(false)}
+          onConfirmado={() => { setNovaMatriculaModal(false); onAtualizar() }}
+        />
+      )}
+
+      {remanejandoMat && (
+        <RemanejamentoModal
+          matricula={remanejandoMat}
+          slotsDisponiveis={slotsComVagas}
+          onClose={() => setRemanejandoMat(null)}
+          onSalvar={() => { setRemanejandoMat(null); onAtualizar() }}
+        />
+      )}
+
+      {realocandoMat && (
+        <RealocacaoModal
+          matricula={realocandoMat}
+          slotsDisponiveis={slotsComVagas}
+          sessoesFuturas={[]}
+          onClose={() => setRealocandoMat(null)}
+          onSalvar={() => { setRealocandoMat(null); onAtualizar() }}
+        />
+      )}
     </div>
   )
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
-export function TurmasClient({ turmas, matriculas, sessoes, profissionais, salas, servicos, pacientes, sequencias = [] }: Props) {
+export function TurmasClient({
+  turmas, matriculas, sessoes, profissionais, salas, servicos, pacientes, sequencias = [],
+  planosServico, novasMatriculas, slotsComVagas,
+}: Props) {
   const [tab, setTab] = useState<Tab>('turmas')
   const [cobrancaMes, setCobrancaMes] = useState(new Date().toISOString().slice(0, 7))
   const [, startT] = useTransition()
@@ -413,10 +768,12 @@ export function TurmasClient({ turmas, matriculas, sessoes, profissionais, salas
     })
   }
 
+  const totalMatriculas = matriculas.filter(m => m.status === 'ativo').length + novasMatriculas.filter(m => m.status === 'ativo').length
+
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'turmas',     label: 'Turmas',     count: turmas.length },
     { id: 'sessoes',    label: 'Sessões',     count: sessoes.filter(s => s.status === 'agendada').length },
-    { id: 'matriculas', label: 'Matrículas',  count: matriculas.filter(m => m.status === 'ativo').length },
+    { id: 'matriculas', label: 'Matrículas',  count: totalMatriculas },
   ]
 
   return (
@@ -447,9 +804,25 @@ export function TurmasClient({ turmas, matriculas, sessoes, profissionais, salas
         )}
       </div>
 
-      {tab === 'turmas'     && <AbasTurmas turmas={turmas} matriculas={matriculas} profissionais={profissionais} salas={salas} servicos={servicos} pacientes={pacientes} sequencias={sequencias} onAtualizar={atualizar} />}
-      {tab === 'sessoes'    && <AbaSessoes sessoes={sessoes} matriculas={matriculas} onAtualizar={atualizar} />}
-      {tab === 'matriculas' && <AbaMatriculas matriculas={matriculas} onAtualizar={atualizar} />}
+      {tab === 'turmas' && (
+        <AbasTurmas
+          turmas={turmas} matriculas={matriculas} profissionais={profissionais}
+          salas={salas} servicos={servicos} pacientes={pacientes}
+          sequencias={sequencias} planosServico={planosServico}
+          onAtualizar={atualizar}
+        />
+      )}
+      {tab === 'sessoes' && <AbaSessoes sessoes={sessoes} matriculas={matriculas} onAtualizar={atualizar} />}
+      {tab === 'matriculas' && (
+        <AbaMatriculas
+          matriculas={matriculas}
+          novasMatriculas={novasMatriculas}
+          slotsComVagas={slotsComVagas}
+          pacientes={pacientes}
+          planosServico={planosServico}
+          onAtualizar={atualizar}
+        />
+      )}
 
       {toastCob && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#2C3E50] text-white text-sm px-4 py-3 rounded-xl shadow-lg">

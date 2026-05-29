@@ -192,9 +192,17 @@ export function PacientesClient({ pacientes }: Props) {
                   <tr key={p.id} className="border-b border-[#F0F0F0] last:border-0 hover:bg-[#F8F9FA]/50">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#4A3AE8]/15 text-[#4A3AE8] flex items-center justify-center font-bold text-sm flex-shrink-0">
-                          {p.nome.charAt(0).toUpperCase()}
-                        </div>
+                        {p.foto_url ? (
+                          <img
+                            src={p.foto_url}
+                            alt={p.nome}
+                            className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-[#E8E8E8]"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-[#4A3AE8]/15 text-[#4A3AE8] flex items-center justify-center font-bold text-sm flex-shrink-0">
+                            {p.nome.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <Link
                             href={`/pacientes/${p.id}`}

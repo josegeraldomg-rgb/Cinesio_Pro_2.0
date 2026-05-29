@@ -18,6 +18,7 @@ import {
   gerarPDFLaudo,
   gerarPDFAtestado,
   gerarPDFProntuario,
+  gerarPDFEvolucoes,
   abrirPDF,
   type EmpresaPDF,
   type PacientePDF,
@@ -116,6 +117,7 @@ export function ProntuarioClient({
   )
   const [salvando, setSalvando]   = useState(false)
   const [erro, setErro]           = useState<string | null>(null)
+  const [pdfViewer, setPdfViewer] = useState<{ url: string; nome: string } | null>(null)
 
   // Lock state — verificado no client para evitar SSR mismatch
   const lockInfo   = parseLock(prontuario.anamnese)
@@ -206,6 +208,17 @@ export function ProntuarioClient({
     const html = gerarPDFProntuario(empresaPDF, pacientePDF, {
       alergias: prontuario.alergias, antecedentes: prontuario.antecedentes, medicamentos: prontuario.medicamentos,
     }, registros)
+    abrirPDF(html)
+  }
+
+  function handleExportarEvolucoes() {
+    const evolucoes: RegistroPDF[] = timeline
+      .filter(r => r.tipo === 'evolucao' || r.tipo === 'copiloto')
+      .map(r => ({
+        tipo: r.tipo, criado_em: r.criado_em, profissional_nome: r.profissional_nome,
+        resumo: r.resumo, dados: r.dados,
+      }))
+    const html = gerarPDFEvolucoes(empresaPDF, pacientePDF, evolucoes)
     abrirPDF(html)
   }
 
@@ -407,16 +420,25 @@ export function ProntuarioClient({
             {/* Evolução Rápida */}
             <EvolucaoRapida onSalvar={handleSalvarEvolucao} salvando={salvando} />
 
-            {/* Filtros */}
-            <div className="flex gap-1 mb-4 overflow-x-auto pb-1 mt-4">
-              {filtrosTabs.map(tab => (
-                <button key={tab.key} onClick={() => handleFiltro(tab.key)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    filtro === tab.key
-                      ? 'bg-[#3B82F6] text-white shadow-sm'
-                      : 'bg-white border border-[#E2E8F0] text-[#64748B] hover:border-[#CBD5E1]'
-                  }`}>{tab.label}</button>
-              ))}
+            {/* Filtros + Exportar Evoluções */}
+            <div className="flex items-center gap-2 mb-4 mt-4 flex-wrap">
+              <div className="flex gap-1 overflow-x-auto pb-0.5 flex-1 min-w-0">
+                {filtrosTabs.map(tab => (
+                  <button key={tab.key} onClick={() => handleFiltro(tab.key)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      filtro === tab.key
+                        ? 'bg-[#3B82F6] text-white shadow-sm'
+                        : 'bg-white border border-[#E2E8F0] text-[#64748B] hover:border-[#CBD5E1]'
+                    }`}>{tab.label}</button>
+                ))}
+              </div>
+              <button
+                onClick={handleExportarEvolucoes}
+                title="Gerar PDF com todas as evoluções clínicas"
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#1D4ED8] bg-[#EFF6FF] text-xs font-semibold text-[#1D4ED8] hover:bg-[#DBEAFE] transition-colors cursor-pointer">
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>picture_as_pdf</span>
+                PDF Evoluções
+              </button>
             </div>
 
             {/* Timeline */}
@@ -462,6 +484,7 @@ export function ProntuarioClient({
                             empresaPDF={empresaPDF}
                             pacientePDF={pacientePDF}
                             profissionais={profissionais}
+                            onVerPDF={(url, nome) => setPdfViewer({ url, nome })}
                           />
                         </div>
                       )}
@@ -555,6 +578,10 @@ export function ProntuarioClient({
             setModal(null); await recarregarTimeline()
           }}
           salvando={salvando} erro={erro} />
+      )}
+
+      {pdfViewer && (
+        <VisualizadorPDFModal url={pdfViewer.url} nome={pdfViewer.nome} onClose={() => setPdfViewer(null)} />
       )}
     </>
   )
@@ -835,11 +862,12 @@ function EvolucaoRapida({ onSalvar, salvando }: { onSalvar: (c: string) => void;
 
 // ─── Detalhe expandido ────────────────────────────────────────────────────────
 
-function DetalheRegistro({ reg, empresaPDF, pacientePDF, profissionais }: {
+function DetalheRegistro({ reg, empresaPDF, pacientePDF, profissionais, onVerPDF }: {
   reg: RegistroTimeline
   empresaPDF: EmpresaPDF
   pacientePDF: PacientePDF
   profissionais: ProfissionalItem[]
+  onVerPDF?: (url: string, nome: string) => void
 }) {
   const d = reg.dados
 
@@ -946,19 +974,38 @@ function DetalheRegistro({ reg, empresaPDF, pacientePDF, profissionais }: {
     const url  = String(d.url ?? '')
     const nome = String(d.nome ?? 'Arquivo')
     const mime = String(d.tipo_mime ?? '')
+    const isImage = mime.startsWith('image/')
+    const isPdf   = !isImage && (
+      mime === 'application/pdf' ||
+      /\.pdf(\?|#|$)/i.test(url) ||
+      (!mime && url.length > 0)   // sem mime mas tem URL → tenta como PDF
+    )
     return (
       <div className="mt-3">
         {Boolean(d.comentario) && <p className="text-sm text-[#64748B] mb-2">{String(d.comentario)}</p>}
         {url
-          ? mime.startsWith('image/')
+          ? isImage
             ? <a href={url} target="_blank" rel="noreferrer">
                 <img src={url} alt={nome} className="max-h-48 rounded-lg border border-[#E2E8F0]" />
               </a>
-            : <a href={url} target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm text-[#3B82F6] hover:bg-[#EFF6FF]">
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>attach_file</span>{nome}
-              </a>
-          : <p className="text-sm text-[#94A3B8]">{nome}</p>
+            : <div className="flex items-center gap-2 flex-wrap">
+                {onVerPDF && (
+                  <button onClick={() => onVerPDF(url, nome)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-[#92400E] bg-[#FEF3C7] text-sm font-semibold text-[#92400E] hover:bg-[#FDE68A] transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
+                    Visualizar
+                  </button>
+                )}
+                <a href={url} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] text-sm text-[#3B82F6] hover:bg-[#EFF6FF] transition-colors">
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                  Baixar
+                </a>
+              </div>
+          : <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FEF9C3] border border-[#FDE68A] text-sm text-[#92400E]">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>info</span>
+              Arquivo não enviado — apenas o nome foi salvo.
+            </div>
         }
       </div>
     )
@@ -1171,28 +1218,38 @@ function AnexarModal({ pacienteId, onClose, onSalvar, salvando, erro }: {
   pacienteId: string; onClose: () => void; onSalvar: (d: Record<string, unknown>) => void
   salvando: boolean; erro: string | null
 }) {
-  const [nome,       setNome]       = useState('')
-  const [comentario, setComentario] = useState('')
-  const [uploading,  setUploading]  = useState(false)
-  const [fileUrl,    setFileUrl]    = useState('')
-  const [fileMime,   setFileMime]   = useState('')
+  const [nome,        setNome]        = useState('')
+  const [comentario,  setComentario]  = useState('')
+  const [uploading,   setUploading]   = useState(false)
+  const [fileUrl,     setFileUrl]     = useState('')
+  const [fileMime,    setFileMime]    = useState('')
+  const [uploadErro,  setUploadErro]  = useState<string | null>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
   const input2Ref = useRef<HTMLInputElement>(null)
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
     if (!nome) setNome(file.name)
-    setFileMime(file.type); setUploading(true)
+    setFileMime(file.type)
+    setUploading(true)
+    setUploadErro(null)
+    setFileUrl('')
     try {
       const sb   = createClient()
-      const ext  = file.name.split('.').pop()
+      const ext  = file.name.split('.').pop() ?? 'bin'
       const path = `${pacienteId}/${Date.now()}.${ext}`
       const { data, error } = await sb.storage.from('prontuarios').upload(path, file, { upsert: true })
-      if (!error) {
+      if (error) {
+        setUploadErro(`Falha no upload: ${error.message}`)
+      } else {
         const { data: pub } = sb.storage.from('prontuarios').getPublicUrl(data.path)
         setFileUrl(pub.publicUrl)
       }
-    } catch {} finally { setUploading(false) }
+    } catch (err: unknown) {
+      setUploadErro(`Erro inesperado: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -1212,17 +1269,31 @@ function AnexarModal({ pacienteId, onClose, onSalvar, salvando, erro }: {
               placeholder="Observações ou anotações sobre este documento..."
               className="w-full h-20 text-sm border border-[#E2E8F0] rounded-xl px-4 py-3 outline-none focus:border-[#3B82F6] resize-none" />
           </Field>
+          {uploadErro && (
+            <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+              <span className="material-symbols-outlined flex-shrink-0 mt-0.5" style={{ fontSize: 16 }}>error</span>
+              <div>
+                <p className="font-semibold">Falha no upload do arquivo</p>
+                <p className="text-xs mt-0.5 text-red-600">{uploadErro}</p>
+                <p className="text-xs mt-1 text-red-500">Verifique se o bucket &quot;prontuarios&quot; existe no Supabase Storage e tem permissão de escrita.</p>
+              </div>
+            </div>
+          )}
           {fileUrl
             ? <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-50 border border-green-200 text-sm text-green-700">
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>Arquivo enviado
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                Arquivo enviado com sucesso!
               </div>
             : <div className="grid grid-cols-2 gap-3">
                 <input ref={inputRef}  type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={handleFile} />
                 <input ref={input2Ref} type="file" accept="image/*"         className="hidden" onChange={handleFile} />
                 <button onClick={() => inputRef.current?.click()} disabled={uploading}
                   className="flex flex-col items-center gap-2 py-6 rounded-2xl border-2 border-dashed border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1] hover:text-[#64748B] transition-all">
-                  <span className="material-symbols-outlined" style={{ fontSize: 32 }}>description</span>
-                  <span className="text-sm font-medium">Documento/PDF</span>
+                  {uploading
+                    ? <span className="material-symbols-outlined animate-spin" style={{ fontSize: 32 }}>progress_activity</span>
+                    : <span className="material-symbols-outlined" style={{ fontSize: 32 }}>description</span>
+                  }
+                  <span className="text-sm font-medium">{uploading ? 'Enviando…' : 'Documento/PDF'}</span>
                 </button>
                 <button onClick={() => input2Ref.current?.click()} disabled={uploading}
                   className="flex flex-col items-center gap-2 py-6 rounded-2xl border-2 border-dashed border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1] hover:text-[#64748B] transition-all">
@@ -1237,7 +1308,7 @@ function AnexarModal({ pacienteId, onClose, onSalvar, salvando, erro }: {
           <button onClick={onClose}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-[#64748B] hover:bg-[#F1F5F9]">Cancelar</button>
           <button onClick={() => onSalvar({ nome, comentario, url: fileUrl, tipo_mime: fileMime })}
-            disabled={salvando || uploading || !nome.trim()}
+            disabled={salvando || uploading || !nome.trim() || Boolean(uploadErro)}
             className="px-5 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-60"
             style={{ background: '#92400E' }}>
             {uploading ? 'Enviando…' : salvando ? 'Salvando…' : 'Salvar Anexo'}
@@ -1245,6 +1316,44 @@ function AnexarModal({ pacienteId, onClose, onSalvar, salvando, erro }: {
         </div>
       </ModalBox>
     </Backdrop>
+  )
+}
+
+// ─── Modal Visualizador PDF ───────────────────────────────────────────────────
+
+function VisualizadorPDFModal({ url, nome, onClose }: {
+  url: string; nome: string; onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col" style={{ background: 'rgba(0,0,0,0.75)' }}>
+      {/* Barra superior */}
+      <div className="flex items-center justify-between px-4 py-3 bg-[#1E293B] text-white flex-shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#FCD34D' }}>picture_as_pdf</span>
+          <span className="text-sm font-semibold truncate">{nome}</span>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+          <a href={url} target="_blank" rel="noreferrer" download={nome}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm transition-colors">
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+            Baixar
+          </a>
+          <button onClick={onClose}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm transition-colors">
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+            Fechar
+          </button>
+        </div>
+      </div>
+      {/* Iframe */}
+      <div className="flex-1 min-h-0">
+        <iframe
+          src={`${url}#toolbar=1&navpanes=0`}
+          className="w-full h-full border-0"
+          title={nome}
+        />
+      </div>
+    </div>
   )
 }
 

@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useTransition, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
+import { Camera, Loader2 } from 'lucide-react'
+import { uploadAvatarUsuarioAction } from '@/app/(dashboard)/perfil/actions'
 
 // SVG do logo oficial do WhatsApp
 function WhatsAppSvg({ size = 22 }: { size?: number }) {
@@ -50,6 +52,7 @@ interface SidebarProps {
   userName?:      string
   userEmail?:     string
   empresaNome?:   string
+  userFoto?:      string | null
   expanded?:      boolean
   pinned?:        boolean
   onHoverChange?: (v: boolean) => void
@@ -60,17 +63,22 @@ export function Sidebar({
   userName    = 'Usuário',
   userEmail   = '',
   empresaNome = 'CinesioPro',
+  userFoto    = null,
   expanded    = false,
   pinned      = false,
   onHoverChange,
   onPinToggle,
 }: SidebarProps) {
-  const pathname = usePathname()
-  const router   = useRouter()
-  const supabase = createClient()
+  const pathname  = usePathname()
+  const router    = useRouter()
+  const supabase  = createClient()
+  const fileInput = useRef<HTMLInputElement>(null)
 
   // Tooltip portal — necessário porque o aside tem overflow:hidden
-  const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
+  const [tooltip,       setTooltip]       = useState<{ label: string; y: number } | null>(null)
+  const [fotoPreview,   setFotoPreview]   = useState<string | null>(userFoto)
+  const [isUploading,   setIsUploading]   = useState(false)
+  const [, startUpload] = useTransition()
 
   const showTooltip = useCallback((label: string, el: HTMLElement) => {
     const rect = el.getBoundingClientRect()
@@ -78,6 +86,24 @@ export function Sidebar({
   }, [])
 
   const hideTooltip = useCallback(() => setTooltip(null), [])
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploading(true)
+    // Pré-visualização imediata
+    const reader = new FileReader()
+    reader.onload = ev => setFotoPreview(ev.target?.result as string)
+    reader.readAsDataURL(file)
+    const fd = new FormData()
+    fd.append('file', file)
+    startUpload(async () => {
+      const res = await uploadAvatarUsuarioAction(fd)
+      if (!res?.error && res?.url) setFotoPreview(res.url)
+      setIsUploading(false)
+    })
+    e.target.value = ''
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -170,21 +196,61 @@ export function Sidebar({
           paddingRight:  16,
         }}
       >
-        {/* Avatar */}
+        {/* Avatar (foto ou inicial) com upload ao clicar quando expandido */}
         <div
-          className="flex items-center justify-center text-white font-bold select-none transition-all duration-300 flex-shrink-0"
+          className="relative group transition-all duration-300 flex-shrink-0"
           style={{
             width:        expanded ? 80 : 40,
             height:       expanded ? 80 : 40,
             borderRadius: '50%',
-            fontSize:     expanded ? 24 : 15,
-            background:   'rgba(255,255,255,0.15)',
             boxShadow:    expanded
               ? '0 0 0 2px rgba(255,255,255,0.4), 0 0 0 6px rgba(91,95,207,0.6)'
               : '0 0 0 2px rgba(255,255,255,0.35)',
           }}
         >
-          {getInitial(userName)}
+          {/* Foto ou inicial */}
+          {fotoPreview ? (
+            <img
+              src={fotoPreview}
+              alt={userName}
+              className="w-full h-full rounded-full object-cover"
+            />
+          ) : (
+            <div
+              className="w-full h-full rounded-full flex items-center justify-center text-white font-bold select-none"
+              style={{
+                fontSize:   expanded ? 24 : 15,
+                background: 'rgba(255,255,255,0.15)',
+              }}
+            >
+              {getInitial(userName)}
+            </div>
+          )}
+
+          {/* Overlay de câmera — só quando expandido */}
+          {expanded && (
+            <button
+              type="button"
+              title="Alterar foto de perfil"
+              onClick={() => fileInput.current?.click()}
+              disabled={isUploading}
+              className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 outline-none"
+            >
+              {isUploading
+                ? <Loader2 size={22} className="text-white animate-spin" />
+                : <Camera  size={22} className="text-white" />
+              }
+            </button>
+          )}
+
+          {/* Input de arquivo oculto */}
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
         </div>
 
         {/* Nome e email — visíveis quando expandido */}

@@ -40,6 +40,7 @@ export async function salvarServicoAction(formData: FormData) {
   const icone           = String(formData.get('icone') ?? '') || null
   const permite_online  = formData.get('permite_agendamento_online') === 'on'
   const ativo           = formData.get('ativo') !== 'off'
+  const modalidade      = String(formData.get('modalidade') ?? 'individual') === 'turma' ? 'turma' : 'individual'
 
   if (!nome) return { error: 'Informe o nome do serviço.' }
   if (Number.isNaN(duracao_minutos) || duracao_minutos < 1) return { error: 'Duração inválida.' }
@@ -57,6 +58,7 @@ export async function salvarServicoAction(formData: FormData) {
     icone,
     permite_agendamento_online: permite_online,
     ativo,
+    modalidade,
   }
 
   let res
@@ -149,19 +151,21 @@ export async function setVinculosProfissionaisAction(
 ) {
   const ctx = await getContext()
   if ('error' in ctx) return { error: ctx.error }
-  const { supabase } = ctx
+  const { supabase, empresa_id } = ctx
 
   // Estratégia simples: apaga tudo e reinsere — mais previsível que diff
   const { error: delErr } = await supabase
     .from('servico_profissional')
     .delete()
     .eq('servico_id', servicoId)
+    .eq('empresa_id', empresa_id)
 
   if (delErr) return { error: delErr.message }
 
   if (vinculos.length > 0) {
     const { error: insErr } = await supabase.from('servico_profissional').insert(
       vinculos.map(v => ({
+        empresa_id,
         servico_id: servicoId,
         profissional_id: v.profissional_id,
         valor_override: v.valor_override,

@@ -39,12 +39,12 @@ export default async function EquipePage() {
   ] = await Promise.all([
     supabase
       .from('usuarios')
-      .select('id, nome, email, perfil, ativo, created_at')
+      .select('id, nome, email, perfil, ativo, created_at, avatar_url')
       .eq('empresa_id', empresaId)
       .order('created_at', { ascending: false }),
     supabase
       .from('servicos')
-      .select('id, nome, descricao, categoria_id, tipo, duracao_minutos, valor, cor, icone, ativo, permite_agendamento_online')
+      .select('id, nome, descricao, categoria_id, tipo, duracao_minutos, valor, cor, icone, ativo, permite_agendamento_online, modalidade')
       .eq('empresa_id', empresaId)
       .order('nome'),
     supabase

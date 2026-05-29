@@ -191,6 +191,54 @@ export function ServicoForm({ servico, categorias, onClose }: Props) {
             </div>
           </div>
 
+          {/* Modalidade */}
+          <div>
+            <label className="text-xs font-semibold text-[#7F8C8D] mb-2 block">Modalidade de uso *</label>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  value: 'individual',
+                  label: 'Atendimento Individual',
+                  desc: 'Aparece na Agenda para agendamentos avulsos',
+                  icon: 'person',
+                  color: '#3498DB',
+                },
+                {
+                  value: 'turma',
+                  label: 'Turma / Grupo',
+                  desc: 'Aparece em Turmas para planos e matrículas',
+                  icon: 'groups',
+                  color: '#27AE60',
+                },
+              ].map(opt => {
+                const current = servico?.modalidade ?? 'individual'
+                return (
+                  <label key={opt.value} className="relative cursor-pointer">
+                    <input
+                      type="radio"
+                      name="modalidade"
+                      value={opt.value}
+                      defaultChecked={current === opt.value}
+                      className="sr-only peer"
+                    />
+                    <div className="flex flex-col gap-1 border-2 border-[#E8E8E8] rounded-xl p-3 transition-all peer-checked:border-[#4A3AE8] peer-checked:bg-[#4A3AE8]/5">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: `${opt.color}18`, color: opt.color }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{opt.icon}</span>
+                        </span>
+                        <span className="text-sm font-bold text-[#2C3E50]">{opt.label}</span>
+                      </div>
+                      <p className="text-xs text-[#7F8C8D] pl-9">{opt.desc}</p>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+
           {/* Toggles */}
           <div className="space-y-3 pt-2">
             <label className="flex items-center gap-3 cursor-pointer">

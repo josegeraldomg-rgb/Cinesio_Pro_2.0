@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
+import { AvatarPaciente } from './avatar-paciente'
 import { GraficoRecuperacao } from './grafico-recuperacao'
 import { formatDate } from '@/lib/utils'
 import { BtnAplicarFormulario } from '@/components/formularios/btn-aplicar-formulario'
@@ -59,8 +60,12 @@ export default async function PacientePerfilPage({ params }: { params: { id: str
       <Card>
         <div className="flex items-start gap-5">
           <div className="relative">
-            <Avatar name={paciente.nome} src={paciente.foto_url} size="xl" />
-            <div className="absolute -bottom-1 -right-1 bg-[#27AE60] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+            <AvatarPaciente
+              pacienteId={paciente.id}
+              nome={paciente.nome}
+              fotoUrl={paciente.foto_url}
+            />
+            <div className="absolute -bottom-1 -right-1 bg-[#27AE60] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ bottom: -2, right: -2 }}>
               ATIVO
             </div>
           </div>

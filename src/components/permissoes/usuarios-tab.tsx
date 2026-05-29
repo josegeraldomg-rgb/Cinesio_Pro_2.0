@@ -5,6 +5,7 @@ import { Plus, Shield } from 'lucide-react'
 import type { PerfilDef } from '@/lib/permissoes'
 import type { UsuarioRow, ServicoResumo } from '@/app/(dashboard)/usuarios/usuarios-client'
 import { NovoUsuarioWizard } from '@/components/usuarios/novo-usuario-wizard'
+import { Avatar } from '@/components/ui/avatar'
 
 interface Props {
   usuarios: UsuarioRow[]
@@ -62,9 +63,7 @@ export function UsuariosTab({ usuarios, perfis, servicos, podeCriar }: Props) {
                   <tr key={u.id} className="border-b border-[#F0F0F0] last:border-0 hover:bg-[#F8F9FA]/50">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#4A3AE8]/15 text-[#4A3AE8] flex items-center justify-center font-bold text-sm">
-                          {(u.nome || u.email).charAt(0).toUpperCase()}
-                        </div>
+                        <Avatar name={u.nome || u.email} src={u.avatar_url} size="md" />
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-[#2C3E50] truncate">{u.nome || '—'}</p>
                           <p className="text-xs text-[#7F8C8D] truncate">{u.email}</p>

@@ -51,6 +51,7 @@ export interface SessaoPresenca {
   duracao_minutos: number
   status: string
   sequencia_id: string | null
+  sequencias_ids: string[]
   evolucao_padrao: string | null
 }
 
@@ -102,13 +103,31 @@ export async function buscarSessaoPresencaAction(sessaoId: string): Promise<
     validade_credito_dias: typeof cfg.reposicao_validade_dias === 'number' ? cfg.reposicao_validade_dias : 30,
   }
 
-  // Busca sessão (incluindo slot_id para auto-preencher sequencia)
-  const { data: sessaoRaw, error: errSessao } = await admin
+  // Busca sessão — tenta com sequencias_ids; se a coluna não existir ainda, recai sem ela
+  let sessaoRaw: Record<string, unknown> | null = null
+  let errSessao: { message: string } | null = null
+
+  const r1 = await admin
     .from('turma_sessoes')
-    .select('id, turma_id, slot_id, data_hora, duracao_minutos, status, sequencia_id, evolucao_padrao, turmas(nome, profissional_id)')
+    .select('id, turma_id, slot_id, data_hora, duracao_minutos, status, sequencia_id, sequencias_ids, evolucao_padrao, turmas(nome, profissional_id)')
     .eq('id', sessaoId)
     .eq('empresa_id', empresa_id)
     .maybeSingle()
+
+  if (r1.error && r1.error.message.includes('sequencias_ids')) {
+    // Coluna ainda não existe no banco — faz fallback sem ela
+    const r2 = await admin
+      .from('turma_sessoes')
+      .select('id, turma_id, slot_id, data_hora, duracao_minutos, status, sequencia_id, evolucao_padrao, turmas(nome, profissional_id)')
+      .eq('id', sessaoId)
+      .eq('empresa_id', empresa_id)
+      .maybeSingle()
+    sessaoRaw = (r2.data as Record<string, unknown> | null)
+    errSessao = r2.error
+  } else {
+    sessaoRaw = (r1.data as Record<string, unknown> | null)
+    errSessao = r1.error
+  }
 
   if (errSessao || !sessaoRaw) return { error: errSessao?.message ?? 'Sessão não encontrada.' }
 
@@ -123,31 +142,74 @@ export async function buscarSessaoPresencaAction(sessaoId: string): Promise<
     sequenciaEfetiva = (slotRaw as any)?.sequencia_padrao_id ?? null
   }
 
+  // sequencias_ids: usa o novo campo se existir; senão inicializa com o sequencia_id herdado
+  const rawSeqIds: string[] = Array.isArray((sessaoRaw as any).sequencias_ids)
+    ? (sessaoRaw as any).sequencias_ids
+    : []
+  const sequenciasIdsEfetivas: string[] = rawSeqIds.length > 0
+    ? rawSeqIds
+    : (sequenciaEfetiva ? [sequenciaEfetiva] : [])
+
+  const sr = sessaoRaw as any
   const sessao: SessaoPresenca = {
-    id: sessaoRaw.id,
-    turma_id: sessaoRaw.turma_id,
-    turma_nome: (sessaoRaw.turmas as any)?.nome ?? 'Turma',
-    profissional_id: (sessaoRaw.turmas as any)?.profissional_id ?? null,
-    data_hora: sessaoRaw.data_hora,
-    duracao_minutos: sessaoRaw.duracao_minutos,
-    status: sessaoRaw.status,
+    id: sr.id as string,
+    turma_id: sr.turma_id as string,
+    turma_nome: sr.turmas?.nome ?? 'Turma',
+    profissional_id: sr.turmas?.profissional_id ?? null,
+    data_hora: sr.data_hora as string,
+    duracao_minutos: sr.duracao_minutos as number,
+    status: sr.status as string,
     sequencia_id: sequenciaEfetiva,
-    evolucao_padrao: sessaoRaw.evolucao_padrao ?? null,
+    sequencias_ids: sequenciasIdsEfetivas,
+    evolucao_padrao: sr.evolucao_padrao ?? null,
   }
 
   // Verifica trava temporal (RN8)
   const horasDesde = (Date.now() - new Date(sessao.data_hora).getTime()) / 3_600_000
   const travada = horasDesde > config.trava_horas
 
-  // Busca matrículas ativas da turma
-  const { data: matriculas } = await admin
+  // Busca alunos — union do modelo antigo + novo modelo
+
+  // Modelo antigo: turma_matriculas WHERE turma_id AND status='ativo'
+  const { data: matriculasAntigas } = await admin
     .from('turma_matriculas')
     .select('id, paciente_id, pacientes(nome, telefone, ddi)')
     .eq('turma_id', sessao.turma_id)
     .eq('empresa_id', empresa_id)
-    .eq('status', 'ativo')   // constraint: 'ativo' | 'pausado' | 'encerrado'
+    .eq('status', 'ativo')
 
-  const alunos: PresencaAluno[] = ((matriculas ?? []) as any[])
+  // Modelo novo: matricula_slots WHERE slot_id=sessao.slot_id AND ativo=true
+  //             → matriculas WHERE status='ativo' → pacientes
+  let matriculasNovas: any[] = []
+  if ((sessaoRaw as any).slot_id) {
+    const { data: mSlots } = await admin
+      .from('matricula_slots')
+      .select('matricula_id, matriculas(id, paciente_id, status, pacientes(nome, telefone, ddi))')
+      .eq('slot_id', (sessaoRaw as any).slot_id)
+      .eq('empresa_id', empresa_id)
+      .eq('ativo', true)
+
+    matriculasNovas = ((mSlots ?? []) as any[])
+      .filter(ms => (ms.matriculas as any)?.status === 'ativo')
+      .map(ms => ({
+        id: (ms.matriculas as any)?.id,
+        paciente_id: (ms.matriculas as any)?.paciente_id,
+        pacientes: (ms.matriculas as any)?.pacientes,
+        _fromNovoModelo: true,
+      }))
+  }
+
+  // Merge e deduplica por paciente_id
+  const vistos = new Set<string>()
+  const todosAlunos: any[] = []
+  for (const m of [...(matriculasAntigas ?? []), ...matriculasNovas]) {
+    if (!vistos.has(m.paciente_id)) {
+      vistos.add(m.paciente_id)
+      todosAlunos.push(m)
+    }
+  }
+
+  const alunos: PresencaAluno[] = todosAlunos
     .sort((a, b) => (a.pacientes?.nome ?? '').localeCompare(b.pacientes?.nome ?? '', 'pt-BR'))
     .map((m: any) => ({
       matricula_id: m.id,
@@ -207,6 +269,7 @@ export async function salvarPresencaEvolucaoAction(payload: {
   profissional_id: string | null
   evolucao_padrao: string
   sequencia_id: string | null
+  sequencias_ids: string[]
   presencas: { paciente_id: string; status: string; evolucao_individual: string }[]
 }): Promise<{ success: true } | { error: string }> {
   const ctx = await getCtx()
@@ -253,16 +316,37 @@ export async function salvarPresencaEvolucaoAction(payload: {
     if (errPresenca) return { error: errPresenca.message }
   }
 
-  // Atualiza turma_sessoes (sequencia_id, evolucao_padrao, status)
-  const { error: errSessao } = await admin
+  // Atualiza turma_sessoes — tenta com sequencias_ids; se coluna não existir, salva sem ela
+  const updatePayloadComColuna = {
+    sequencia_id: payload.sequencias_ids[0] ?? payload.sequencia_id,
+    sequencias_ids: payload.sequencias_ids,
+    evolucao_padrao: payload.evolucao_padrao || null,
+    status: 'realizada',
+  }
+  const updatePayloadSemColuna = {
+    sequencia_id: payload.sequencias_ids[0] ?? payload.sequencia_id,
+    evolucao_padrao: payload.evolucao_padrao || null,
+    status: 'realizada',
+  }
+
+  let errSessao: { message: string } | null = null
+  const upd1 = await admin
     .from('turma_sessoes')
-    .update({
-      sequencia_id: payload.sequencia_id,
-      evolucao_padrao: payload.evolucao_padrao || null,
-      status: 'realizada',
-    })
+    .update(updatePayloadComColuna)
     .eq('id', payload.sessao_id)
     .eq('empresa_id', empresa_id)
+
+  if (upd1.error && upd1.error.message.includes('sequencias_ids')) {
+    // Coluna ainda não existe — salva sem ela
+    const upd2 = await admin
+      .from('turma_sessoes')
+      .update(updatePayloadSemColuna)
+      .eq('id', payload.sessao_id)
+      .eq('empresa_id', empresa_id)
+    errSessao = upd2.error
+  } else {
+    errSessao = upd1.error
+  }
 
   if (errSessao) return { error: errSessao.message }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock, Globe, Users, Pencil, Power } from 'lucide-react'
+import { Clock, Globe, Users, Pencil, Power, CalendarDays, UsersRound } from 'lucide-react'
 import { toggleServicoAtivoAction } from '@/app/(dashboard)/servicos/actions'
 import { formatCurrency } from '@/lib/utils'
 import type { Servico, Categoria, Profissional, Vinculo } from '@/app/(dashboard)/servicos/servicos-client'
@@ -80,15 +80,28 @@ export function ListaServicos({ servicos, categorias, vinculos, profissionais, p
                       {s.icone || icone}
                     </span>
                   </div>
-                  {s.permite_agendamento_online && (
-                    <span
-                      title="Disponível para agendamento online"
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#27AE60] bg-[#27AE60]/10 rounded-full px-2 py-0.5"
-                    >
-                      <Globe size={11} />
-                      Online
-                    </span>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {s.modalidade === 'turma' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#27AE60] bg-[#27AE60]/10 rounded-full px-2 py-0.5">
+                        <UsersRound size={11} />
+                        Turma
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#3498DB] bg-[#3498DB]/10 rounded-full px-2 py-0.5">
+                        <CalendarDays size={11} />
+                        Individual
+                      </span>
+                    )}
+                    {s.permite_agendamento_online && (
+                      <span
+                        title="Disponível para agendamento online"
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#7F8C8D] bg-[#F0F0F0] rounded-full px-2 py-0.5"
+                      >
+                        <Globe size={11} />
+                        Online
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <h4 className="font-bold text-[#2C3E50] text-base mb-1 truncate">{s.nome}</h4>

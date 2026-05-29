@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import { ConexaoTab } from './conexao-tab'
 import { TemplatesTab } from './templates-tab'
 import { PainelTab } from './painel-tab'
+import { HistoricoTab } from './historico-tab'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export interface LogEntry {
@@ -268,7 +269,7 @@ export function WhatsappClient({ isDev }: { isDev: boolean }) {
         {/* Conteúdo da aba */}
         <div className="px-6">
           {aba === 'painel'      && <PainelTab onGoConexao={() => setAba('conexao')} />}
-          {aba === 'historico'   && <EmBreve titulo="Histórico"          descricao="Todas as conversas com pacientes — busca, filtros por data, status e profissional." />}
+          {aba === 'historico'   && <HistoricoTab />}
           {aba === 'templates'   && <TemplatesTab />}
           {aba === 'conexao'     && <ConexaoTab addLog={addLog} debugEnabled={debugEnabled} />}
           {aba === 'agente-ia'   && <EmBreve titulo="Agente IA"         descricao="Configure um assistente inteligente para responder dúvidas, agendar e enviar confirmações automaticamente." />}

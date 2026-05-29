@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -12,7 +12,7 @@ import { CATEGORIAS } from '@/lib/formularios/tipos'
 import { MapaCorporal, ZONA_NOMES } from '@/components/formularios/mapa-corporal'
 import { CAMPOS_BIBLIOTECA } from '@/lib/formularios/campos-biblioteca'
 
-// ─── Diálogo de confirmação de duplicação ─────────────────────────────────────
+// â”€â”€â”€ DiÃ¡logo de confirmaÃ§Ã£o de duplicaÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ModalDuplicar({
   form,
   onConfirm,
@@ -26,7 +26,7 @@ function ModalDuplicar({
 }) {
   const cat = CATEGORIAS[form.categoria]
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
@@ -34,14 +34,14 @@ function ModalDuplicar({
             <span className="material-symbols-outlined" style={{ fontSize: 20, color: cat?.cor ?? '#6b7280' }}>{cat?.icone ?? 'article'}</span>
           </div>
           <div>
-            <p className="font-bold text-gray-900">Duplicar formulário</p>
+            <p className="font-bold text-gray-900">Duplicar formulÃ¡rio</p>
             <p className="text-xs text-gray-500">{cat?.label}</p>
           </div>
         </div>
         <p className="text-sm text-gray-600 mb-1">
-          Será criada uma cópia de <strong>"{form.nome}"</strong> em <strong>Meus Formulários</strong>, onde você pode editá-la livremente.
+          SerÃ¡ criada uma cÃ³pia de <strong>"{form.nome}"</strong> em <strong>Meus FormulÃ¡rios</strong>, onde vocÃª pode editÃ¡-la livremente.
         </p>
-        <p className="text-xs text-gray-400 mb-6">O original da biblioteca não será alterado.</p>
+        <p className="text-xs text-gray-400 mb-6">O original da biblioteca nÃ£o serÃ¡ alterado.</p>
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
             Cancelar
@@ -60,7 +60,7 @@ function ModalDuplicar({
   )
 }
 
-// ─── Card de formulário ───────────────────────────────────────────────────────
+// â”€â”€â”€ Card de formulÃ¡rio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function FormCard({
   form,
   onDuplicar,
@@ -76,14 +76,14 @@ function FormCard({
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 6px 24px rgba(0,0,0,0.1)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)' }}
     >
-      {/* Cabeçalho */}
+      {/* CabeÃ§alho */}
       <div className="flex items-start justify-between gap-2">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: cat?.corBg ?? '#f3f4f6' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 20, color: cat?.cor ?? '#6b7280' }}>{cat?.icone ?? 'article'}</span>
         </div>
         {form.pontuavel && (
           <span className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 flex-shrink-0">
-            <Star size={10} fill="currentColor" /> Pontuável
+            <Star size={10} fill="currentColor" /> PontuÃ¡vel
           </span>
         )}
       </div>
@@ -104,7 +104,7 @@ function FormCard({
         </div>
       )}
 
-      {/* Rodapé */}
+      {/* RodapÃ© */}
       <div className="flex items-center justify-between pt-2 border-t border-gray-100">
         <div className="flex items-center gap-3 text-xs text-gray-400">
           <span className="flex items-center gap-1">
@@ -128,7 +128,7 @@ function FormCard({
   )
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// â”€â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function BibliotecaClient() {
   const router = useRouter()
   const [busca, setBusca] = useState('')
@@ -191,7 +191,7 @@ export function BibliotecaClient() {
   return (
     <div className="flex h-full min-h-screen" style={{ background: '#EDEFF3' }}>
 
-      {/* ── Sidebar de categorias ─────────────────────────────────────────── */}
+      {/* â”€â”€ Sidebar de categorias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <aside className="w-64 flex-shrink-0 p-4 pr-0">
         <div className="bg-white rounded-2xl overflow-hidden h-full" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
           <div className="px-4 py-4 border-b border-gray-100">
@@ -202,7 +202,7 @@ export function BibliotecaClient() {
               <BookOpen size={16} className="text-[#5b5fcf]" />
               <p className="font-bold text-gray-800 text-sm">Biblioteca</p>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">{BIBLIOTECA.length} formulários disponíveis</p>
+            <p className="text-xs text-gray-400 mt-0.5">{BIBLIOTECA.length} formulÃ¡rios disponÃ­veis</p>
 
             {/* Toggle modo de filtro */}
             <div className="flex mt-3 bg-gray-100 rounded-xl p-0.5 gap-0.5">
@@ -224,12 +224,12 @@ export function BibliotecaClient() {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <PersonStanding size={12} /> Região
+                <PersonStanding size={12} /> RegiÃ£o
               </button>
             </div>
           </div>
 
-          {/* ── Modo Categoria ───────────────────────────────────────────────── */}
+          {/* â”€â”€ Modo Categoria â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           {filterMode === 'categoria' && (
             <nav className="p-3 flex flex-col gap-0.5">
               {/* Todos */}
@@ -275,7 +275,7 @@ export function BibliotecaClient() {
             </nav>
           )}
 
-          {/* ── Modo Corpo ───────────────────────────────────────────────────── */}
+          {/* â”€â”€ Modo Corpo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           {filterMode === 'corpo' && (
             <div className="p-4">
               <MapaCorporal
@@ -287,7 +287,7 @@ export function BibliotecaClient() {
         </div>
       </aside>
 
-      {/* ── Área principal ────────────────────────────────────────────────── */}
+      {/* â”€â”€ Ãrea principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <main className="flex-1 p-4 pl-4 overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
@@ -296,14 +296,14 @@ export function BibliotecaClient() {
               {filterMode === 'corpo' && zonaSelecionada
                 ? (ZONA_NOMES[zonaSelecionada] ?? zonaSelecionada)
                 : filterMode === 'corpo'
-                  ? 'Todas as Regiões'
+                  ? 'Todas as RegiÃµes'
                   : catFiltro
                     ? CATEGORIAS[catFiltro]?.label
-                    : 'Todos os Formulários'
+                    : 'Todos os FormulÃ¡rios'
               }
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {filtrados.length} formulário{filtrados.length !== 1 ? 's' : ''}
+              {filtrados.length} formulÃ¡rio{filtrados.length !== 1 ? 's' : ''}
               {busca && ` para "${busca}"`}
             </p>
           </div>
@@ -315,7 +315,7 @@ export function BibliotecaClient() {
               type="text"
               value={busca}
               onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar formulários, tags..."
+              placeholder="Buscar formulÃ¡rios, tags..."
               className="pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#5b5fcf]/30 focus:border-[#5b5fcf] w-64"
               style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
             />
@@ -333,7 +333,7 @@ export function BibliotecaClient() {
         {filtrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
             <Search size={32} className="text-gray-300 mb-3" />
-            <p className="font-semibold text-gray-700 mb-1">Nenhum formulário encontrado</p>
+            <p className="font-semibold text-gray-700 mb-1">Nenhum formulÃ¡rio encontrado</p>
             <p className="text-sm text-gray-400">Tente outro termo ou categoria</p>
           </div>
         ) : (
@@ -345,7 +345,7 @@ export function BibliotecaClient() {
         )}
       </main>
 
-      {/* ── Modal duplicar ────────────────────────────────────────────────── */}
+      {/* â”€â”€ Modal duplicar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {duplicando && (
         <ModalDuplicar
           form={duplicando}
@@ -357,3 +357,4 @@ export function BibliotecaClient() {
     </div>
   )
 }
+

@@ -281,6 +281,92 @@ export async function vincularPacienteAction(
   }
 }
 
+// ─── Diagnóstico: últimos logs do webhook ────────────────────────────────────
+export async function buscarLogsWebhookAction(): Promise<
+  { data: { criado_em: string; event_type: string; resumo: string }[] } | { error: string }
+> {
+  try {
+    const { empresaId } = await getEmpresaId()
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from('whatsapp_webhook_debug_logs')
+      .select('criado_em, event_type, payload')
+      .eq('empresa_id', empresaId)
+      .order('criado_em', { ascending: false })
+      .limit(8)
+    if (error) return { error: error.message }
+    return {
+      data: (data ?? []).map((r: any) => ({
+        criado_em:  r.criado_em,
+        event_type: r.event_type ?? '?',
+        resumo:
+          r.payload?.data?.key?.remoteJid ??
+          r.payload?.data?.[0]?.key?.remoteJid ??
+          r.payload?.error ??
+          JSON.stringify(r.payload).slice(0, 80),
+      })),
+    }
+  } catch (e: any) {
+    return { error: e.message ?? 'Erro ao buscar logs' }
+  }
+}
+
+// ─── Diagnóstico: simula chegada de mensagem direto no banco ─────────────────
+export async function simularMensagemAction(): Promise<
+  { success: true; telefone: string } | { error: string }
+> {
+  try {
+    const { empresaId } = await getEmpresaId()
+    const admin = createAdminClient()
+
+    const telefone = '5500000000001'
+    const jid      = `${telefone}@s.whatsapp.net`
+    const msgId    = `SIM-${Date.now()}`
+
+    const { data: conv, error: convErr } = await admin
+      .from('whatsapp_conversas')
+      .upsert(
+        {
+          empresa_id:      empresaId,
+          jid,
+          telefone,
+          nome_contato:    '✅ Teste de Pipeline',
+          ultima_mensagem: '✅ Mensagem de teste',
+          ultima_msg_at:   new Date().toISOString(),
+          ultima_de_mim:   false,
+          ultima_tipo:     'text',
+          nao_lidas:       1,
+        },
+        { onConflict: 'empresa_id,jid', ignoreDuplicates: false },
+      )
+      .select('id')
+      .single()
+
+    if (convErr || !conv) return { error: convErr?.message ?? 'Falha ao criar conversa de teste' }
+
+    const { error: msgErr } = await admin
+      .from('whatsapp_mensagens')
+      .upsert(
+        {
+          empresa_id:  empresaId,
+          conversa_id: conv.id,
+          message_id:  msgId,
+          de_mim:      false,
+          tipo:        'text',
+          conteudo:    '✅ Mensagem de teste — pipeline funcionando! Se você ver isso, o banco e o frontend estão OK.',
+          status:      'sent',
+          enviado_em:  new Date().toISOString(),
+        },
+        { onConflict: 'empresa_id,message_id', ignoreDuplicates: true },
+      )
+
+    if (msgErr) return { error: msgErr.message }
+    return { success: true, telefone }
+  } catch (e: any) {
+    return { error: e.message ?? 'Erro ao simular mensagem' }
+  }
+}
+
 // ─── Criar paciente rápido a partir de um contato ────────────────────────────
 export async function cadastrarContatoRapidoAction(
   conversaId: string,

@@ -184,40 +184,9 @@ export function BibliotecaClient({ exerciciosIniciais, sequenciasIniciais, plano
   return (
     <div className="h-full flex flex-col space-y-4">
 
-      {/* Header */}
+      {/* Header — abas + botão na mesma linha */}
       <div className="flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="font-bold text-[#2C3E50] text-lg">Biblioteca de Exercícios</h1>
-          <p className="text-xs text-[#7F8C8D] mt-0.5">Gerencie exercícios, sequências de aula e planos de tratamento</p>
-        </div>
-        {aba === 'exercicios' && (
-          <button
-            onClick={() => setExFormModal({})}
-            className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#3829c7] shadow-md transition-colors"
-          >
-            <Plus size={16} /> Novo Exercício
-          </button>
-        )}
-        {aba === 'sequencias' && (
-          <button
-            onClick={() => setSeqModal({})}
-            className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#3829c7] shadow-md transition-colors"
-          >
-            <Plus size={16} /> Nova Sequência
-          </button>
-        )}
-        {aba === 'planos' && (
-          <button
-            onClick={() => setPlanoModal({})}
-            className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#3829c7] shadow-md transition-colors"
-          >
-            <Plus size={16} /> Nova Prescrição
-          </button>
-        )}
-      </div>
-
-      {/* Abas */}
-      <div className="flex items-center gap-1 flex-shrink-0 bg-white border border-[#E8E8E8] rounded-xl p-1 w-fit">
+        <div className="flex items-center gap-1 bg-white border border-[#E8E8E8] rounded-xl p-1 w-fit">
         {ABAS.map(a => (
           <button
             key={a.id}
@@ -235,6 +204,27 @@ export function BibliotecaClient({ exerciciosIniciais, sequenciasIniciais, plano
             </span>
           </button>
         ))}
+        </div>
+
+        {/* Botão de ação contextual */}
+        {aba === 'exercicios' && (
+          <button onClick={() => setExFormModal({})}
+            className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#3829c7] shadow-md transition-colors">
+            <Plus size={16} /> Novo Exercício
+          </button>
+        )}
+        {aba === 'sequencias' && (
+          <button onClick={() => setSeqModal({})}
+            className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#3829c7] shadow-md transition-colors">
+            <Plus size={16} /> Nova Sequência
+          </button>
+        )}
+        {aba === 'planos' && (
+          <button onClick={() => setPlanoModal({})}
+            className="flex items-center gap-2 bg-[#4A3AE8] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#3829c7] shadow-md transition-colors">
+            <Plus size={16} /> Nova Prescrição
+          </button>
+        )}
       </div>
 
       {/* ── Aba Exercícios ─────────────────────────────────────────────────────── */}

@@ -111,7 +111,9 @@ export function ProntuarioClient({
   const [timeline, setTimeline]   = useState<RegistroTimeline[]>(timelineInicial)
   const [filtro, setFiltro]       = useState<FiltroTimeline>('todos')
   const [modal, setModal]         = useState<ModalTipo>(null)
-  const [expandido, setExpandido] = useState<Set<string>>(new Set())
+  const [expandido, setExpandido] = useState<Set<string>>(
+    () => timelineInicial.length > 0 ? new Set([timelineInicial[0].id]) : new Set()
+  )
   const [salvando, setSalvando]   = useState(false)
   const [erro, setErro]           = useState<string | null>(null)
 
@@ -149,7 +151,12 @@ export function ProntuarioClient({
     setFiltro(f)
     startTransition(async () => {
       const res = await listarTimelineAction(paciente.id, f)
-      if ('data' in res) setTimeline(res.data)
+      if ('data' in res) {
+        setTimeline(res.data)
+        if (res.data.length > 0) {
+          setExpandido(new Set([res.data[0].id]))
+        }
+      }
     })
   }
 
@@ -159,7 +166,12 @@ export function ProntuarioClient({
 
   async function recarregarTimeline() {
     const res = await listarTimelineAction(paciente.id, filtro)
-    if ('data' in res) setTimeline(res.data)
+    if ('data' in res) {
+      setTimeline(res.data)
+      if (res.data.length > 0) {
+        setExpandido(prev => new Set([res.data[0].id, ...prev]))
+      }
+    }
   }
 
   function abrirModal(m: ModalTipo) { setErro(null); setModal(m) }
@@ -1018,30 +1030,51 @@ function DetalheRegistro({ reg, empresaPDF, pacientePDF, profissionais }: {
 
 // ─── Utilitários ──────────────────────────────────────────────────────────────
 
-function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Backdrop({ onClose, children, wide, maximized }: {
+  onClose: () => void; children: React.ReactNode; wide?: boolean; maximized?: boolean
+}) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: 'rgba(15,23,42,0.6)' }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="w-full max-w-lg max-h-[92vh] overflow-y-auto">
+      <div
+        onClick={e => e.stopPropagation()}
+        className={`w-full transition-all duration-300 ${
+          maximized
+            ? 'max-w-none h-screen rounded-none'
+            : wide
+              ? 'max-w-3xl max-h-[92vh] overflow-y-auto'
+              : 'max-w-lg max-h-[92vh] overflow-y-auto'
+        }`}
+        style={maximized ? { position: 'fixed', inset: 0, height: '100dvh', overflow: 'auto' } : undefined}
+      >
         {children}
       </div>
     </div>
   )
 }
 
-function ModalBox({ title, icon, iconColor, onClose, children }: {
+function ModalBox({ title, icon, iconColor, onClose, children, maximizable, maximized, onToggleMaximize }: {
   title: string; icon?: string; iconColor?: string; onClose: () => void; children: React.ReactNode
+  maximizable?: boolean; maximized?: boolean; onToggleMaximize?: () => void
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-      <div className="flex items-center gap-2 px-6 py-4 border-b border-[#F1F5F9]">
+    <div className={`bg-white shadow-2xl overflow-hidden ${maximized ? 'rounded-none min-h-screen flex flex-col' : 'rounded-2xl'}`}>
+      <div className="flex items-center gap-2 px-6 py-4 border-b border-[#F1F5F9] flex-shrink-0">
         {icon && <span className="material-symbols-outlined" style={{ fontSize: 20, color: iconColor }}>{icon}</span>}
         <h2 className="font-bold text-[#1E293B] flex-1">{title}</h2>
+        {maximizable && (
+          <button onClick={onToggleMaximize} title={maximized ? 'Restaurar' : 'Maximizar'}
+            className="text-[#94A3B8] hover:text-[#64748B] mr-1">
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+              {maximized ? 'close_fullscreen' : 'open_in_full'}
+            </span>
+          </button>
+        )}
         <button onClick={onClose} className="text-[#94A3B8] hover:text-[#64748B]">
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
         </button>
       </div>
-      <div className="px-6 py-5">{children}</div>
+      <div className={`px-6 py-5 ${maximized ? 'flex-1 overflow-y-auto' : ''}`}>{children}</div>
     </div>
   )
 }
@@ -1386,16 +1419,17 @@ function CopilotoModal({ onClose, onSalvar, salvando, erro }: {
   onClose: () => void; onSalvar: (d: Record<string, unknown>) => void
   salvando: boolean; erro: string | null
 }) {
-  const [gravando,  setGravando]  = useState(false)
-  const [canal,     setCanal]     = useState('Presencial')
-  const [pa,        setPa]        = useState('')
-  const [fc,        setFc]        = useState('')
-  const [temp,      setTemp]      = useState('')
-  const [queixa,    setQueixa]    = useState('')
-  const [anamnese,  setAnamnese]  = useState('')
-  const [conduta,   setConduta]   = useState('')
-  const [cid,       setCid]       = useState('')
-  const [anotacoes, setAnotacoes] = useState('')
+  const [gravando,   setGravando]   = useState(false)
+  const [maximized,  setMaximized]  = useState(false)
+  const [canal,      setCanal]      = useState('Presencial')
+  const [pa,         setPa]         = useState('')
+  const [fc,         setFc]         = useState('')
+  const [temp,       setTemp]       = useState('')
+  const [queixa,     setQueixa]     = useState('')
+  const [anamnese,   setAnamnese]   = useState('')
+  const [conduta,    setConduta]    = useState('')
+  const [cid,        setCid]        = useState('')
+  const [anotacoes,  setAnotacoes]  = useState('')
   const mediaRef = useRef<MediaRecorder | null>(null)
 
   async function toggleGravacao() {
@@ -1408,86 +1442,127 @@ function CopilotoModal({ onClose, onSalvar, salvando, erro }: {
     } catch { alert('Permita o acesso ao microfone.') }
   }
 
+  const inputCls = 'w-full text-sm border border-[#E2E8F0] rounded-xl px-3 py-2.5 outline-none focus:border-[#BE185D] bg-white'
+  const taCls    = (h: string) => `w-full ${h} text-sm border border-[#E2E8F0] rounded-xl px-3 py-2.5 outline-none focus:border-[#BE185D] resize-y bg-white`
+
   return (
-    <Backdrop onClose={onClose}>
-      <ModalBox title="Copiloto Clínico por Voz (AI Scribe)" icon="auto_awesome" iconColor="#BE185D" onClose={onClose}>
-        <p className="text-xs text-[#64748B] mb-4">
-          Grave o relato do atendimento. Nossa IA estruturará sua consulta em termos médicos e sinais vitais.
-        </p>
-        <div className="bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] p-5 flex flex-col items-center gap-3 mb-5">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
-            gravando ? 'bg-red-100 animate-pulse' : 'bg-[#FCE7F3]'
+    <Backdrop onClose={onClose} wide maximized={maximized}>
+      <ModalBox
+        title="Copiloto Clínico por Voz (AI Scribe)"
+        icon="auto_awesome" iconColor="#BE185D" onClose={onClose}
+        maximizable maximized={maximized} onToggleMaximize={() => setMaximized(v => !v)}
+      >
+
+        {/* ── Faixa de gravação ── */}
+        <div className="flex items-center gap-4 bg-gradient-to-r from-[#FFF1F2] to-[#F5F3FF] rounded-2xl border border-pink-100 px-5 py-4 mb-5">
+          {/* Ícone mic */}
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+            gravando ? 'bg-red-100 animate-pulse' : 'bg-white shadow-sm'
           }`}>
-            <span className="material-symbols-outlined" style={{ fontSize: 32, color: gravando ? '#EF4444' : '#BE185D' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 26, color: gravando ? '#EF4444' : '#BE185D' }}>
               {gravando ? 'mic' : 'mic_none'}
             </span>
           </div>
-          <p className="text-xs text-[#64748B]">{gravando ? 'Gravando… clique para parar' : 'Clique no microfone para iniciar'}</p>
-          <div className="flex gap-2">
+          {/* Texto + botões */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[#1E293B] mb-0.5">
+              {gravando ? '🔴 Gravando…' : 'Grave o relato do atendimento'}
+            </p>
+            <p className="text-xs text-[#64748B]">
+              {gravando ? 'Clique em Parar quando terminar. A IA estruturará a consulta automaticamente.' : 'Nossa IA transcreve e estrutura em termos clínicos e sinais vitais.'}
+            </p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
             <button onClick={toggleGravacao}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white ${gravando ? 'bg-red-500' : 'hover:opacity-90'}`}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white ${gravando ? 'bg-red-500 hover:bg-red-600' : 'hover:opacity-90'}`}
               style={!gravando ? { background: 'linear-gradient(135deg,#7C3AED,#DB2777)' } : {}}>
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{gravando ? 'stop' : 'mic'}</span>
-              {gravando ? 'Parar' : 'Gravar Relato'}
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{gravando ? 'stop' : 'mic'}</span>
+              {gravando ? 'Parar' : 'Gravar'}
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-[#E2E8F0] text-[#64748B]">
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span>Upload de Áudio
+            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F8FAFC]">
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>upload</span>Upload
             </button>
           </div>
         </div>
-        <div className="space-y-4">
-          <Field label="Canal de Atendimento *">
-            <select value={canal} onChange={e => setCanal(e.target.value)}
-              className="w-full text-sm border border-[#E2E8F0] rounded-xl px-3 py-2.5 outline-none bg-white">
-              {['Presencial', 'Teleconsulta', 'Domiciliar'].map(o => <option key={o}>{o}</option>)}
-            </select>
-          </Field>
-          <div className="bg-[#FFF1F2] rounded-xl p-3 border border-pink-100">
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#BE185D' }}>favorite</span>
-              <span className="text-xs font-bold text-[#BE185D] uppercase tracking-wide">Sinais Vitais</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {([['PA', 'Ex: 120/80', pa, setPa], ['FC', 'Ex: 80 bpm', fc, setFc], ['Temp (°C)', 'Ex: 36.5', temp, setTemp]] as const).map(([l, p, v, s]) => (
-                <div key={String(l)}>
-                  <p className="text-[10px] text-[#94A3B8] mb-1">{String(l)}</p>
-                  <input value={String(v)} onChange={e => (s as (x: string) => void)(e.target.value)}
-                    placeholder={String(p)}
-                    className="w-full text-xs border border-[#E2E8F0] rounded-lg px-2 py-2 outline-none focus:border-[#BE185D] bg-white" />
-                </div>
-              ))}
-            </div>
+
+        {/* ── Grid 2 colunas ── */}
+        <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+
+          {/* Coluna esquerda */}
+          <div className="space-y-4">
+            <Field label="Canal de Atendimento *">
+              <select value={canal} onChange={e => setCanal(e.target.value)} className={inputCls}>
+                {['Presencial', 'Teleconsulta', 'Domiciliar'].map(o => <option key={o}>{o}</option>)}
+              </select>
+            </Field>
+
+            <Field label="Queixa Principal *">
+              <input value={queixa} onChange={e => setQueixa(e.target.value)}
+                placeholder="Ex: Cefaleia constante com picos febris..."
+                className={inputCls} />
+            </Field>
+
+            <Field label="Anamnese / Histórico Clínico">
+              <textarea value={anamnese} onChange={e => setAnamnese(e.target.value)}
+                placeholder="Descreva o histórico clínico e achados do exame..."
+                className={taCls('h-[108px]')} />
+            </Field>
+
+            <Field label="Conduta Terapêutica / Prescrição">
+              <textarea value={conduta} onChange={e => setConduta(e.target.value)}
+                placeholder="Medicamentos, encaminhamentos e recomendações..."
+                className={taCls('h-[88px]')} />
+            </Field>
           </div>
-          <Field label="Queixa Principal *">
-            <input value={queixa} onChange={e => setQueixa(e.target.value)}
-              placeholder="Ex: Cefaleia constante acompanhada de picos febris..."
-              className="w-full text-sm border border-[#E2E8F0] rounded-xl px-4 py-2.5 outline-none focus:border-[#BE185D]" />
-          </Field>
-          <Field label="Anamnese / Histórico Clínico">
-            <textarea value={anamnese} onChange={e => setAnamnese(e.target.value)}
-              placeholder="Descreva o histórico clínico e achados do exame..."
-              className="w-full h-24 text-sm border border-[#E2E8F0] rounded-xl px-4 py-3 outline-none focus:border-[#BE185D] resize-none" />
-          </Field>
-          <Field label="Conduta Terapêutica / Prescrição">
-            <textarea value={conduta} onChange={e => setConduta(e.target.value)}
-              placeholder="Medicamentos orientados, encaminhamentos e recomendações..."
-              className="w-full h-24 text-sm border border-[#E2E8F0] rounded-xl px-4 py-3 outline-none focus:border-[#BE185D] resize-none" />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* Coluna direita */}
+          <div className="space-y-4">
+            {/* Sinais Vitais */}
+            <div className="bg-[#FFF1F2] rounded-xl border border-pink-100 p-3">
+              <div className="flex items-center gap-1.5 mb-3">
+                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#BE185D' }}>favorite</span>
+                <span className="text-xs font-bold text-[#BE185D] uppercase tracking-wide">Sinais Vitais</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ['PA',       'Ex: 120/80', pa,   setPa],
+                  ['FC',       'Ex: 80 bpm', fc,   setFc],
+                  ['Temp °C',  'Ex: 36.5',   temp, setTemp],
+                ] as const).map(([l, ph, v, s]) => (
+                  <div key={String(l)}>
+                    <p className="text-[10px] text-[#BE185D] font-semibold mb-1">{String(l)}</p>
+                    <input
+                      value={String(v)}
+                      onChange={e => (s as (x: string) => void)(e.target.value)}
+                      placeholder={String(ph)}
+                      className="w-full text-xs border border-pink-100 rounded-lg px-2 py-2 outline-none focus:border-[#BE185D] bg-white"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <Field label="Hipótese Diagnóstica (CID)">
-              <input value={cid} onChange={e => setCid(e.target.value)} placeholder="Ex: R51"
-                className="w-full text-sm border border-[#E2E8F0] rounded-xl px-3 py-2.5 outline-none focus:border-[#BE185D]" />
+              <input value={cid} onChange={e => setCid(e.target.value)}
+                placeholder="Ex: R51 — Cefaleia"
+                className={inputCls} />
             </Field>
+
             <Field label="Anotações Internas">
-              <input value={anotacoes} onChange={e => setAnotacoes(e.target.value)} placeholder="Obs. administrativas..."
-                className="w-full text-sm border border-[#E2E8F0] rounded-xl px-3 py-2.5 outline-none focus:border-[#BE185D]" />
+              <textarea value={anotacoes} onChange={e => setAnotacoes(e.target.value)}
+                placeholder="Observações administrativas, lembretes..."
+                className={taCls('h-[108px]')} />
             </Field>
           </div>
         </div>
+
         {erro && <ErroBanner msg={erro} />}
+
         <div className="flex gap-2 mt-5 justify-end">
           <button onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-[#64748B] hover:bg-[#F1F5F9]">Descartar</button>
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-[#64748B] hover:bg-[#F1F5F9]">
+            Descartar
+          </button>
           <button
             onClick={() => onSalvar({ canal, queixa, anamnese, conduta, cid, anotacoes, sinais_vitais: { pa, fc, temp } })}
             disabled={salvando || !queixa.trim()}

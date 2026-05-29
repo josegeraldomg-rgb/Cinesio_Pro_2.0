@@ -137,10 +137,6 @@ export function FormulariosClient({ formularios, envios }: Props) {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Formulários</h1>
-          <p className="text-sm text-gray-500 mt-1">Crie, envie e acompanhe formulários clínicos dos seus pacientes</p>
-        </div>
         <div className="flex gap-2">
           <Link
             href="/formularios/biblioteca"

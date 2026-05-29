@@ -10,6 +10,7 @@ import {
   configurarWebhookWaAction,
   verWebhookWaAction,
   verWebhookErrosWaAction,
+  enviarBoasVindasAction,
 } from './actions'
 import type { WebhookErro } from './actions'
 import type { WaStatusResult } from './actions'
@@ -245,11 +246,12 @@ export function ConexaoTab({
           safeSetStatus('qrcode')
         }
 
-        // 2. Conectado → para tudo
+        // 2. Conectado → para tudo e ativa webhook (Momento B)
         if (res.status === 'connected') {
           pollActive.current = false
           applyStatus(res)
           showToast('WhatsApp conectado com sucesso! ✓')
+          ativarWebhook(res.jid)  // configura webhook + envia boas-vindas
           return
         }
 
@@ -290,6 +292,16 @@ export function ConexaoTab({
   }
   function stopCountdown() {
     if (cdRef.current) { clearInterval(cdRef.current); cdRef.current = null }
+  }
+
+  // ── Configura webhook + envia boas-vindas (Momentos A e B) ─────────────────
+  async function ativarWebhook(jid: string) {
+    const res = await configurarWebhookWaAction()
+    logReqRes('configurarWebhook [auto]', res)
+    if ('success' in res) {
+      // Boas-vindas: confirma canal de mão dupla no próprio celular
+      enviarBoasVindasAction(jid).catch(() => {})
+    }
   }
 
   // ── Mascara valores sensíveis (tokens) nos logs ──────────────────────────
@@ -376,6 +388,7 @@ export function ConexaoTab({
       applyStatus(statusRes)
       if (!('error' in statusRes) && statusRes.status === 'connected') {
         showToast('WhatsApp já está conectado! ✓')
+        ativarWebhook(statusRes.jid)  // Momento A
       }
       return
     }
@@ -406,6 +419,9 @@ export function ConexaoTab({
       const statusRes = await getStatusWaAction()
       logReqRes('getStatus [already_connected]', statusRes)
       applyStatus(statusRes)
+      if (!('error' in statusRes) && statusRes.status === 'connected') {
+        ativarWebhook(statusRes.jid)  // Momento A (reconexão)
+      }
       return
     }
     if ('qrcode' in res) {

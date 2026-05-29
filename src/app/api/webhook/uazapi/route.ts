@@ -59,18 +59,32 @@ export async function POST(req: NextRequest) {
 
     if (!empresaId) return NextResponse.json({ ok: true, skipped: 'unknown_instance' })
 
-    // ── Eventos de mensagem (vários formatos possíveis da UAZAPI / Evolution)
-    const isMsgEvent = ['message', 'messages'].some(s => event_type.toLowerCase().includes(s))
-    if (isMsgEvent && !event_type.includes('update') && !event_type.includes('ack')) {
+    // ── Normaliza event_type para comparações case-insensitive
+    const et = event_type.toLowerCase()
+
+    // ── Eventos de mensagem (UAZAPI pode enviar em maiúsculo ou minúsculo)
+    const isMsgEvent = ['message', 'messages'].some(s => et.includes(s))
+    if (isMsgEvent && !et.includes('update') && !et.includes('ack')) {
       const data  = payload.data ?? payload.message ?? payload
       const items = Array.isArray(data) ? data : [data]
       for (const item of items) {
-        await processarMensagem(admin, empresaId, item)
+        try {
+          await processarMensagem(admin, empresaId, item)
+        } catch (msgErr: any) {
+          console.error('[webhook/uazapi] processarMensagem falhou:', msgErr?.message)
+          try {
+            await admin.from('whatsapp_webhook_debug_logs').insert({
+              empresa_id: empresaId,
+              event_type: `ERRO:${event_type}`,
+              payload:    { error: msgErr?.message, stack: msgErr?.stack?.slice(0, 300), item },
+            })
+          } catch {}
+        }
       }
     }
 
     // ── Eventos de status (entrega/leitura)
-    if (event_type.includes('update') || event_type.includes('ack')) {
+    if (et.includes('update') || et.includes('ack')) {
       const data  = payload.data ?? payload
       const items = Array.isArray(data) ? data : [data]
       for (const item of items) await processarStatusUpdate(admin, empresaId, item)
@@ -115,7 +129,7 @@ async function processarMensagem(admin: any, empresaId: string, data: any) {
   const pacienteId = pac?.id ?? null
 
   // Upsert conversa
-  const { data: conversa } = await admin
+  const { data: conversa, error: convErr } = await admin
     .from('whatsapp_conversas')
     .upsert(
       {
@@ -134,7 +148,10 @@ async function processarMensagem(admin: any, empresaId: string, data: any) {
     .select('id')
     .single()
 
-  if (!conversa) return
+  if (convErr || !conversa) {
+    console.error('[webhook] upsert conversa falhou:', convErr?.message ?? 'sem dados')
+    return
+  }
 
   // Incrementa nao_lidas atomicamente para mensagens recebidas
   if (!fromMe) {

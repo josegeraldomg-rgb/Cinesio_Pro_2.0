@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
 import { GraficoRecuperacao } from './grafico-recuperacao'
 import { formatDate } from '@/lib/utils'
+import { BtnAplicarFormulario } from '@/components/formularios/btn-aplicar-formulario'
 
 export default async function PacientePerfilPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -86,6 +87,12 @@ export default async function PacientePerfilPage({ params }: { params: { id: str
           </div>
 
           <div className="flex items-center gap-2">
+            <BtnAplicarFormulario
+              pacienteId={paciente.id}
+              pacienteNome={paciente.nome}
+              pacienteTelefone={paciente.telefone ?? undefined}
+              pacienteDdi={paciente.ddi ?? undefined}
+            />
             <Button size="sm">
               <Plus size={14} />
               Nova Sessão

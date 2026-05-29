@@ -300,7 +300,13 @@ async function criarUsuarioPaciente(opts: {
         'Authorization': `Bearer ${SERVICE_ROLE}`,
         'apikey': SERVICE_ROLE,
       },
-      body: JSON.stringify({ email, data: { nome, perfil_inicial: 'paciente' } }),
+      body: JSON.stringify({
+          email,
+          data: { nome, perfil_inicial: 'paciente' },
+          // Após clicar no link do e-mail, o callback verifica o perfil
+          // e redireciona pacientes para /paciente/home
+          redirect_to: `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/auth/callback`,
+        }),
     })
     const inviteData = await inviteRes.json()
 

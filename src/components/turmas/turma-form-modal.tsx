@@ -67,7 +67,7 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
     setDiasSel(prev => prev.includes(dia) ? prev.filter(d => d !== dia) : [...prev, dia].sort())
   }
   function updateOverride(dia: number, patch: Partial<DiaOverride>) {
-    setOverrides(prev => ({ ...prev, [dia]: { sala_id: '', profissional_id: '', expandido: false, ...prev[dia], ...patch } }))
+    setOverrides(prev => ({ ...prev, [dia]: { ...{ sala_id: '', profissional_id: '', expandido: false }, ...prev[dia], ...patch } }))
   }
   const duracao = calcDuracao(horaInicio, horaFim)
 

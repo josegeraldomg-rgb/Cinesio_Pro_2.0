@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { unstable_cache } from 'next/cache'
-import { Sidebar } from '@/components/layout/sidebar'
-import { Header } from '@/components/layout/header'
+import { SidebarProvider } from '@/components/layout/sidebar-provider'
 
 // Busca nome do usuário + nome da empresa uma única vez, depois serve da memória
 // por até 5 minutos. O admin client não usa cookies, então é seguro dentro de
@@ -39,24 +38,27 @@ export default async function DashboardLayout({
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.user) redirect('/login')
 
+  // Pacientes não pertencem ao dashboard — redireciona ao portal
+  const { data: perfil } = await createAdminClient()
+    .from('usuarios')
+    .select('perfil')
+    .eq('id', session.user.id)
+    .maybeSingle()
+
+  if (perfil?.perfil === 'paciente') redirect('/paciente/home')
+
   // Dados cacheados — na segunda navegação em diante isso é <1ms
   const { nome, empresaNome } = await getLayoutData(session.user.id)
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-surface)' }}>
-      <Sidebar
+      <SidebarProvider
         userName={nome || session.user.email || 'Usuário'}
         userEmail={session.user.email || ''}
         empresaNome={empresaNome}
-      />
-      <div className="ml-[280px]">
-        <Header />
-        <main className="pt-20 min-h-screen">
-          <div className="p-6 animate-fade-in">
-            {children}
-          </div>
-        </main>
-      </div>
+      >
+        {children}
+      </SidebarProvider>
     </div>
   )
 }

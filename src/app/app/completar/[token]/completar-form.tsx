@@ -35,9 +35,13 @@ export function CompletarForm({ token, nomePaciente, nomeClinica }: Props) {
           <p className="text-sm text-[#7F8C8D] mb-3">
             Obrigado, {nomePaciente.split(' ')[0]}! Seus dados foram salvos com sucesso.
           </p>
-          <p className="text-xs text-[#7F8C8D]">
-            Verifique seu email — enviamos um link para você definir uma senha e acessar
-            o Portal do Paciente do <strong>{nomeClinica}</strong>.
+          <p className="text-sm text-[#7F8C8D] leading-relaxed">
+            Verifique seu e-mail — enviamos um <strong>link de acesso ao Portal do Paciente</strong> de <strong>{nomeClinica}</strong>.
+          </p>
+          <p className="text-xs text-[#7F8C8D] mt-3 bg-[#F8F9FA] rounded-xl p-3">
+            Pelo portal você pode ver seus agendamentos, acompanhar seu progresso e muito mais.
+            Acesse quando quiser em:{' '}
+            <span className="text-[#4A3AE8] font-semibold">/paciente/login</span>
           </p>
         </div>
       </div>

@@ -332,8 +332,14 @@ export function ResponderForm({
           <p className="text-sm text-gray-500 leading-relaxed mb-4">
             Obrigado, <strong>{nomePaciente.split(' ')[0]}</strong>! Suas respostas foram registradas com sucesso e encaminhadas à equipe de <strong>{nomeClinica}</strong>.
           </p>
+          <a
+            href="/paciente/documentos"
+            className="inline-block w-full py-3 rounded-xl text-sm font-semibold text-white bg-[#4A3AE8] hover:opacity-90 transition-opacity mb-3"
+          >
+            Voltar ao portal
+          </a>
           <p className="text-xs text-gray-400">
-            Você pode fechar esta página.
+            Ou feche esta página.
           </p>
         </div>
       </div>

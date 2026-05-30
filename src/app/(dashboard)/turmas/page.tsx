@@ -82,9 +82,9 @@ export default async function TurmasPage() {
     admin.from('pacientes').select('id, nome, telefone').eq('empresa_id', empresaId).eq('status', 'ativo').order('nome'),
     admin.from('sequencias_aula').select('id, nome').eq('empresa_id', empresaId).order('nome'),
 
-    // Novo modelo
+    // Novo modelo — sem join em servicos (FK pode não existir)
     admin.from('planos_servico')
-      .select('id, servico_id, nome, dias_semana, valor_mensal, ativo, servicos(nome)')
+      .select('id, servico_id, nome, dias_semana, valor_mensal, ativo')
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('nome'),
@@ -94,6 +94,13 @@ export default async function TurmasPage() {
       .eq('empresa_id', empresaId)
       .order('criado_em', { ascending: false }),
   ])
+
+  // Enriquecer planos_servico com nome do serviço (sem depender de FK/join)
+  const servicosMap = Object.fromEntries((servicos ?? []).map((s: any) => [s.id, s]))
+  const planosServico = (planosServicoRaw ?? []).map((p: any) => ({
+    ...p,
+    servicos: servicosMap[p.servico_id] ? { nome: servicosMap[p.servico_id].nome } : null,
+  }))
 
   // Montar slots_ids por matrícula (modelo antigo)
   const slotsByMatricula: Record<string, string[]> = {}
@@ -151,7 +158,7 @@ export default async function TurmasPage() {
       servicos={servicos ?? []}
       pacientes={pacientes ?? []}
       sequencias={(sequencias ?? []) as any}
-      planosServico={(planosServicoRaw ?? []) as any}
+      planosServico={planosServico as any}
       novasMatriculas={novasMatriculas as any}
       slotsComVagas={slotsComVagas}
     />

@@ -88,6 +88,9 @@ export default async function TurmasPage() {
       .order('criado_em', { ascending: false }),
   ])
 
+  // Debug temporário
+  console.log('[turmas/page] empresaId:', empresaId, '| servicos:', servicos?.length ?? 'null', servicos?.map((s:any) => s.nome))
+
   // Montar slots_ids por matrícula (modelo antigo)
   const slotsByMatricula: Record<string, string[]> = {}
   for (const ms of (matriculaSlots ?? [])) {

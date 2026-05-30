@@ -531,7 +531,10 @@ export async function salvarPlanoServicoAction(payload: {
     ;({ error } = await admin.from('planos_servico').insert({ ...rest, empresa_id }))
   }
   if (error) {
-    console.error('[salvarPlanoServicoAction] erro:', error.message, error)
+    console.error('[salvarPlanoServicoAction] erro:', error.message)
+    if (error.message.toLowerCase().includes('relation') || error.message.toLowerCase().includes('does not exist')) {
+      return { error: 'TABELA_NAO_EXISTE: Execute o SQL de migração no Supabase Dashboard (SQL Editor) para criar a tabela planos_servico.' }
+    }
     return { error: error.message }
   }
   revalidatePath('/turmas')

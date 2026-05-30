@@ -91,8 +91,12 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
   }
 
   async function salvarPlano() {
-    if (!editandoPlano?.nome || !editandoPlano?.servico_id || !editandoPlano?.dias_semana) {
-      setErrPlano('Preencha nome, serviço e dias por semana.')
+    if (!editandoPlano?.nome || !editandoPlano?.dias_semana) {
+      setErrPlano('Preencha o nome e os dias por semana.')
+      return
+    }
+    if (!editandoPlano?.servico_id) {
+      setErrPlano('Selecione um serviço. Se a lista estiver vazia, cadastre serviços em Equipe → Serviços.')
       return
     }
     setSavingPlano(true)
@@ -106,7 +110,7 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
       ativo: editandoPlano.ativo ?? true,
     })
     setSavingPlano(false)
-    if ('error' in r) { setErrPlano('Erro: ' + r.error); alert('Erro ao salvar plano: ' + r.error); return }
+    if ('error' in r) { setErrPlano('Erro ao salvar: ' + r.error); return }
     setEditandoPlano(null)
     showToast(editandoPlano.id ? 'Plano atualizado.' : 'Plano criado.')
     onAtualizar()
@@ -183,15 +187,24 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-[#7F8C8D] mb-1">Serviço *</label>
-                    <select
-                      value={editandoPlano.servico_id ?? ''}
-                      onChange={e => setEditandoPlano(prev => ({ ...prev!, servico_id: e.target.value }))}
-                      className="w-full h-9 px-3 border border-[#E8E8E8] rounded-lg text-sm outline-none focus:border-[#4A3AE8] bg-white"
-                    >
-                      <option value="">Selecionar…</option>
-                      {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                    </select>
+                    <label className="block text-xs text-[#7F8C8D] mb-1">
+                      Serviço * {servicos.length === 0 && <span className="text-[#E74C3C] font-semibold">(nenhum cadastrado)</span>}
+                    </label>
+                    {servicos.length === 0 ? (
+                      <div className="w-full h-9 px-3 border border-[#E74C3C]/50 bg-[#E74C3C]/5 rounded-lg text-xs text-[#E74C3C] flex items-center gap-1.5">
+                        <AlertCircle size={13} />
+                        Cadastre serviços em <strong>Equipe → Serviços</strong>
+                      </div>
+                    ) : (
+                      <select
+                        value={editandoPlano.servico_id ?? ''}
+                        onChange={e => setEditandoPlano(prev => ({ ...prev!, servico_id: e.target.value }))}
+                        className="w-full h-9 px-3 border border-[#E8E8E8] rounded-lg text-sm outline-none focus:border-[#4A3AE8] bg-white"
+                      >
+                        <option value="">Selecionar…</option>
+                        {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                      </select>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs text-[#7F8C8D] mb-1">Dias/semana *</label>
@@ -216,7 +229,12 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
                     />
                   </div>
                 </div>
-                {errPlano && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{errPlano}</p>}
+                {errPlano && (
+                  <div className="flex items-start gap-2 text-sm text-[#E74C3C] bg-[#E74C3C]/10 border border-[#E74C3C]/30 px-3 py-2.5 rounded-lg">
+                    <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+                    <span>{errPlano}</span>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <button onClick={() => { setEditandoPlano(null); setErrPlano('') }}
                     className="h-9 px-4 rounded-lg border border-[#E8E8E8] text-sm text-[#7F8C8D] hover:text-[#2C3E50]">

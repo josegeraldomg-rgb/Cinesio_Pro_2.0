@@ -71,7 +71,7 @@ export default async function TurmasPage() {
 
     admin.from('profissionais').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     admin.from('salas').select('id, nome').eq('empresa_id', empresaId),
-    admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).eq('modalidade', 'turma').order('nome'),
+    admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     admin.from('pacientes').select('id, nome, telefone').eq('empresa_id', empresaId).eq('status', 'ativo').order('nome'),
     admin.from('sequencias_aula').select('id, nome').eq('empresa_id', empresaId).order('nome'),
 

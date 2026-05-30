@@ -43,6 +43,28 @@ async function getContext() {
 }
 
 // ════════════════════════════════════════════
+//         ALTERAR STATUS DO PACIENTE
+// ════════════════════════════════════════════
+export async function alterarStatusPacienteAction(
+  id: string,
+  novoStatus: 'ativo' | 'inativo' | 'alta',
+) {
+  const ctx = await getContext()
+  if ('error' in ctx) return { error: ctx.error }
+  const { admin, empresa_id } = ctx
+
+  const { error } = await admin
+    .from('pacientes')
+    .update({ status: novoStatus })
+    .eq('id', id)
+    .eq('empresa_id', empresa_id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/pacientes')
+  return { ok: true }
+}
+
+// ════════════════════════════════════════════
 //             CADASTRO COMPLETO
 // ════════════════════════════════════════════
 export async function salvarPacienteAction(formData: FormData) {

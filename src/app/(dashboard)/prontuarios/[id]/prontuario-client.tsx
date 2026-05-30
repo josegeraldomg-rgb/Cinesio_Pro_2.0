@@ -100,10 +100,12 @@ type FiltroTimeline = 'todos' | TipoRegistro
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function ProntuarioClient({
-  detalhe, timelineInicial,
+  detalhe, timelineInicial, onVoltar,
 }: {
   detalhe: ProntuarioDetalhe
   timelineInicial: RegistroTimeline[]
+  /** Se fornecido, o botão Voltar chama este callback em vez de navegar para /prontuarios */
+  onVoltar?: () => void
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -261,8 +263,8 @@ export function ProntuarioClient({
 
             {/* Botão Voltar */}
             <button
-              onClick={() => router.push('/prontuarios')}
-              title="Voltar para a lista de prontuários"
+              onClick={() => onVoltar ? onVoltar() : router.push('/prontuarios')}
+              title={onVoltar ? 'Voltar para Pacientes' : 'Voltar para a lista de prontuários'}
               className="flex items-center justify-center w-7 h-7 rounded-full border border-[#E2E8F0] bg-[#F8FAFC] text-[#64748B] hover:border-[#CBD5E1] hover:text-[#1E293B] transition-all flex-shrink-0"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>

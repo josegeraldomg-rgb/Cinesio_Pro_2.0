@@ -539,7 +539,7 @@ function PainelDiagnostico({ onMensagemSimulada }: { onMensagemSimulada: () => v
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export function PainelTab({ onGoConexao }: { onGoConexao: () => void }) {
+export function PainelTab({ onGoConexao, pacienteId }: { onGoConexao: () => void; pacienteId?: string }) {
   const [conversas,    setConversas]    = useState<Conversa[]>([])
   const [convSel,      setConvSel]      = useState<Conversa | null>(null)
   const [mensagens,    setMensagens]    = useState<Mensagem[]>([])
@@ -613,6 +613,13 @@ export function PainelTab({ onGoConexao }: { onGoConexao: () => void }) {
   useEffect(() => {
     if (convSel) carregarMensagens(convSel)
   }, [convSel, carregarMensagens])
+
+  // Auto-seleciona conversa quando a página é aberta com ?paciente=ID
+  useEffect(() => {
+    if (!pacienteId || loadingConvs || convSel) return
+    const conv = conversas.find(c => c.paciente_id === pacienteId)
+    if (conv) selecionarConversa(conv)
+  }, [pacienteId, loadingConvs, conversas])
 
   async function selecionarConversa(conv: Conversa) {
     setConvSel(conv)

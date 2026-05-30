@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -15,5 +16,9 @@ export default async function WhatsAppPage() {
     .eq('id', user.id)
     .maybeSingle()
 
-  return <WhatsappClient isDev={me?.perfil === 'dev'} />
+  return (
+    <Suspense>
+      <WhatsappClient isDev={me?.perfil === 'dev'} />
+    </Suspense>
+  )
 }

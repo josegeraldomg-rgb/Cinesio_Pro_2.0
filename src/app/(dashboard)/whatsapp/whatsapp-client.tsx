@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { MessageSquare, History, FileText, Link2, Bot, Bug } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { ConexaoTab } from './conexao-tab'
@@ -185,6 +186,9 @@ function DiagnosticoTab({
 
 // ── Client principal ──────────────────────────────────────────────────────────
 export function WhatsappClient({ isDev }: { isDev: boolean }) {
+  const searchParams = useSearchParams()
+  const pacienteIdParam = searchParams.get('paciente') ?? undefined
+
   const [aba, setAba] = useState<Aba>('painel')
 
   // ── Estado de logs (levantado para compartilhar com DiagnosticoTab) ──────────
@@ -268,7 +272,7 @@ export function WhatsappClient({ isDev }: { isDev: boolean }) {
 
         {/* Conteúdo da aba */}
         <div className="px-6">
-          {aba === 'painel'      && <PainelTab onGoConexao={() => setAba('conexao')} />}
+          {aba === 'painel'      && <PainelTab onGoConexao={() => setAba('conexao')} pacienteId={pacienteIdParam} />}
           {aba === 'historico'   && <HistoricoTab />}
           {aba === 'templates'   && <TemplatesTab />}
           {aba === 'conexao'     && <ConexaoTab addLog={addLog} debugEnabled={debugEnabled} />}

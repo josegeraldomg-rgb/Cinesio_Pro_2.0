@@ -106,7 +106,7 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
       ativo: editandoPlano.ativo ?? true,
     })
     setSavingPlano(false)
-    if ('error' in r) { setErrPlano(r.error); return }
+    if ('error' in r) { setErrPlano('Erro: ' + r.error); alert('Erro ao salvar plano: ' + r.error); return }
     setEditandoPlano(null)
     showToast(editandoPlano.id ? 'Plano atualizado.' : 'Plano criado.')
     onAtualizar()

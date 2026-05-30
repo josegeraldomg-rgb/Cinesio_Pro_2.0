@@ -530,7 +530,10 @@ export async function salvarPlanoServicoAction(payload: {
   } else {
     ;({ error } = await admin.from('planos_servico').insert({ ...rest, empresa_id }))
   }
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[salvarPlanoServicoAction] erro:', error.message, error)
+    return { error: error.message }
+  }
   revalidatePath('/turmas')
   return { success: true }
 }

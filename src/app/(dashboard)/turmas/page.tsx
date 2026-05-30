@@ -3,6 +3,8 @@ import { getEmpresaId } from '@/lib/get-empresa-id'
 import { TurmasClient } from './turmas-client'
 import { listarSlotsComVagasAction } from './actions'
 
+export const dynamic = 'force-dynamic'
+
 const SELECT_SESSAO = `
   id, slot_id, turma_id, data_hora, duracao_minutos, status, observacoes,
   turma_slots(dia_semana, hora_inicio, salas(nome)),

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Users, Calendar, BookOpen, DollarSign, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Search, Pencil, Trash2, FileText, ArrowLeftRight, RefreshCw, AlertCircle } from 'lucide-react'
 import type { Turma, Matricula, TurmaSessao, PlanoServico, NovaMatricula, SlotComVagas } from './actions'
 import { atualizarStatusMatriculaAction, cancelarSessaoAction, gerarCobrancasMensaisAction, inativarTurmaAction, salvarPlanoServicoAction, excluirPlanoServicoAction, encerrarMatriculaAction, pausarReativarMatriculaAction } from './actions'
@@ -755,8 +756,9 @@ export function TurmasClient({
   const [cobrancaMes, setCobrancaMes] = useState(new Date().toISOString().slice(0, 7))
   const [, startT] = useTransition()
   const [toastCob, setToastCob] = useState('')
+  const router = useRouter()
 
-  function atualizar() { window.location.reload() }
+  function atualizar() { router.refresh() }
 
   function gerarCobracas() {
     if (!confirm(`Gerar cobranças pendentes para ${cobrancaMes}?`)) return

@@ -139,21 +139,31 @@ export function EditarTurmaModal({ turma, profissionais, salas, servicos, sequen
 
           <div className="border-t border-[#F0F0F0]" />
 
-          <Section title="Responsáveis e Local">
-            <div className="grid grid-cols-2 gap-3">
+          <Section title="Serviço e Responsáveis">
+            <div className="space-y-3">
               <div>
-                <label className="label-xs">Profissional</label>
-                <select value={profId} onChange={e => setProfId(e.target.value)} className="input-base w-full">
+                <label className="label-xs">Serviço</label>
+                <select value={servicoId} onChange={e => setServicoId(e.target.value)} className="input-base w-full">
                   <option value="">Selecionar…</option>
-                  {profissionais.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                 </select>
+                <p className="text-[10px] text-[#7F8C8D] mt-1">Define quais planos de serviço podem ser usados para matrícula nesta turma.</p>
               </div>
-              <div>
-                <label className="label-xs">Sala Padrão</label>
-                <select value={salaId} onChange={e => setSalaId(e.target.value)} className="input-base w-full">
-                  <option value="">Selecionar…</option>
-                  {salas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label-xs">Profissional</label>
+                  <select value={profId} onChange={e => setProfId(e.target.value)} className="input-base w-full">
+                    <option value="">Selecionar…</option>
+                    {profissionais.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label-xs">Sala Padrão</label>
+                  <select value={salaId} onChange={e => setSalaId(e.target.value)} className="input-base w-full">
+                    <option value="">Selecionar…</option>
+                    {salas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
           </Section>

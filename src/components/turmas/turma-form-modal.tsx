@@ -202,7 +202,15 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
             </div>
 
             <div className="border-t border-[#F0F0F0] pt-4 space-y-3">
-              <p className="text-[10px] font-bold text-[#7F8C8D] uppercase tracking-widest">Responsáveis e Local</p>
+              <p className="text-[10px] font-bold text-[#7F8C8D] uppercase tracking-widest">Serviço e Responsáveis</p>
+              <div>
+                <label className="label-xs">Serviço *</label>
+                <select value={servicoId} onChange={e => setServicoId(e.target.value)} className="input-base w-full">
+                  <option value="">Selecionar…</option>
+                  {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                </select>
+                <p className="text-[10px] text-[#7F8C8D] mt-1">Define quais planos de serviço podem ser usados para matrícula nesta turma.</p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label-xs">Profissional</label>
@@ -417,6 +425,9 @@ export function TurmaFormModal({ profissionais, salas, servicos, onClose, onCria
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                {servicoId && servicos.find(s => s.id === servicoId) && (
+                  <><span className="text-[#7F8C8D]">Serviço</span><span className="font-medium text-[#2C3E50]">{servicos.find(s => s.id === servicoId)?.nome}</span></>
+                )}
                 {profId && profissionais.find(p => p.id === profId) && (
                   <><span className="text-[#7F8C8D]">Profissional</span><span className="font-medium text-[#2C3E50]">{profissionais.find(p => p.id === profId)?.nome}</span></>
                 )}

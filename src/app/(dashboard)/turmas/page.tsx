@@ -71,7 +71,14 @@ export default async function TurmasPage() {
 
     admin.from('profissionais').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     admin.from('salas').select('id, nome').eq('empresa_id', empresaId),
-    admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+    // Serviços: tenta filtrar modalidade='turma'; se a coluna não existir ainda, retorna todos
+    (async () => {
+      const r = await admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).eq('modalidade', 'turma').order('nome')
+      if (r.error?.message?.includes('modalidade')) {
+        return admin.from('servicos').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+      }
+      return r
+    })(),
     admin.from('pacientes').select('id, nome, telefone').eq('empresa_id', empresaId).eq('status', 'ativo').order('nome'),
     admin.from('sequencias_aula').select('id, nome').eq('empresa_id', empresaId).order('nome'),
 
@@ -87,9 +94,6 @@ export default async function TurmasPage() {
       .eq('empresa_id', empresaId)
       .order('criado_em', { ascending: false }),
   ])
-
-  // Debug temporário
-  console.log('[turmas/page] empresaId:', empresaId, '| servicos:', servicos?.length ?? 'null', servicos?.map((s:any) => s.nome))
 
   // Montar slots_ids por matrícula (modelo antigo)
   const slotsByMatricula: Record<string, string[]> = {}

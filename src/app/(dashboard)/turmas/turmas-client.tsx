@@ -63,7 +63,7 @@ type Tab = 'turmas' | 'sessoes' | 'matriculas'
 
 // ─── Aba Turmas (com seção Planos de Serviço) ─────────────────────────────────
 
-function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacientes, sequencias, planosServico, onAtualizar }: {
+function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacientes, sequencias, planosServico: planosServicoProp, onAtualizar }: {
   turmas: Turma[], matriculas: Matricula[], profissionais: Profissional[], salas: Sala[], servicos: Servico[], pacientes: Paciente[], sequencias?: Sequencia[], planosServico: PlanoServico[], onAtualizar: () => void
 }) {
   const [modalCriar, setModalCriar] = useState(false)
@@ -72,11 +72,15 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
   const [toast, setToast] = useState('')
   const [, startT] = useTransition()
 
-  // Planos de serviço state
+  // Planos de serviço state — cópia local para atualização otimista
+  const [planosServico, setPlanosServico] = useState<PlanoServico[]>(planosServicoProp)
   const [mostrarPlanos, setMostrarPlanos] = useState(false)
   const [editandoPlano, setEditandoPlano] = useState<Partial<PlanoServico> | null>(null)
   const [savingPlano, setSavingPlano] = useState(false)
   const [errPlano, setErrPlano] = useState('')
+
+  // Sincroniza quando o servidor atualiza (após router.refresh)
+  useMemo(() => { setPlanosServico(planosServicoProp) }, [planosServicoProp])
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 4000) }
 
@@ -111,16 +115,38 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
     })
     setSavingPlano(false)
     if ('error' in r) { setErrPlano('Erro ao salvar: ' + r.error); return }
+
+    // Atualização otimista — reflete na lista sem esperar o servidor
+    const servicoNome = servicos.find(s => s.id === editandoPlano.servico_id)?.nome ?? null
+    if (editandoPlano.id) {
+      setPlanosServico(prev => prev.map(p => p.id === editandoPlano.id
+        ? { ...p, ...editandoPlano as PlanoServico, servicos: servicoNome ? { nome: servicoNome } : p.servicos }
+        : p
+      ))
+    } else {
+      const novoPlano: PlanoServico = {
+        id: crypto.randomUUID(),
+        servico_id: editandoPlano.servico_id!,
+        nome: editandoPlano.nome!,
+        dias_semana: editandoPlano.dias_semana!,
+        valor_mensal: editandoPlano.valor_mensal ?? 0,
+        ativo: editandoPlano.ativo ?? true,
+        servicos: servicoNome ? { nome: servicoNome } : null,
+      }
+      setPlanosServico(prev => [...prev, novoPlano])
+    }
+
     setEditandoPlano(null)
     showToast(editandoPlano.id ? 'Plano atualizado.' : 'Plano criado.')
-    onAtualizar()
+    onAtualizar() // sincroniza com servidor em background
   }
 
   function excluirPlano(id: string) {
     if (!confirm('Excluir este plano de serviço?')) return
+    setPlanosServico(prev => prev.filter(p => p.id !== id)) // otimista
     startT(async () => {
       const r = await excluirPlanoServicoAction(id)
-      if ('error' in r) { alert(r.error); return }
+      if ('error' in r) { alert(r.error); onAtualizar(); return }
       showToast('Plano excluído.')
       onAtualizar()
     })

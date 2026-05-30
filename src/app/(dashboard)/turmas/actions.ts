@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { gerarSessoesTurma } from '@/lib/scheduling/gerar-sessoes-turma'
+import { getEmpresaId } from '@/lib/get-empresa-id'
 
 // ─── Tipos exportados ────────────────────────────────────────────────────────
 
@@ -133,13 +134,21 @@ export interface TurmaSessao {
 type Ctx = { error: string } | { admin: ReturnType<typeof createAdminClient>; empresa_id: string }
 
 async function getContext(): Promise<Ctx> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autenticado.' }
-  const admin = createAdminClient()
-  const { data: me } = await admin.from('usuarios').select('empresa_id').eq('id', user.id).maybeSingle()
-  if (!me?.empresa_id) return { error: 'Empresa não encontrada.' }
-  return { admin, empresa_id: String(me.empresa_id) }
+  try {
+    const { empresaId } = await getEmpresaId()
+    if (!empresaId) return { error: 'Empresa não encontrada.' }
+    const admin = createAdminClient()
+    return { admin, empresa_id: empresaId }
+  } catch {
+    // fallback: tenta via cookie direto
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Não autenticado.' }
+    const admin = createAdminClient()
+    const { data: me } = await admin.from('usuarios').select('empresa_id').eq('id', user.id).maybeSingle()
+    if (!me?.empresa_id) return { error: 'Empresa não encontrada.' }
+    return { admin, empresa_id: String(me.empresa_id) }
+  }
 }
 
 function revalidate() {

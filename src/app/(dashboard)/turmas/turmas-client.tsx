@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation'
 import { Plus, Users, Calendar, BookOpen, DollarSign, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Search, Pencil, Trash2, FileText, ArrowLeftRight, RefreshCw, AlertCircle } from 'lucide-react'
 import type { Turma, Matricula, TurmaSessao, PlanoServico, NovaMatricula, SlotComVagas } from './actions'
 import { atualizarStatusMatriculaAction, cancelarSessaoAction, gerarCobrancasMensaisAction, inativarTurmaAction, salvarPlanoServicoAction, excluirPlanoServicoAction, encerrarMatriculaAction, pausarReativarMatriculaAction } from './actions'
+import { AbaGestaoTurmas } from './gestao-turmas'
+import { AbaContrato } from './aba-contrato'
 import { TurmaFormModal } from '@/components/turmas/turma-form-modal'
-import { MatriculaModal } from '@/components/turmas/matricula-modal'
+import { MatriculaTurmaModal } from '@/components/turmas/matricula-turma-modal'
 import { EditarTurmaModal } from '@/components/turmas/editar-turma-modal'
 import { NovaMatriculaModal } from '@/components/turmas/nova-matricula-modal'
 import { RemanejamentoModal } from '@/components/turmas/remanejamento-modal'
 import { RealocacaoModal } from '@/components/turmas/realocacao-modal'
+import { SlotDetailModal, type AlunoSlotInfo } from '@/components/turmas/slot-detail-modal'
 import Link from 'next/link'
 import { gerarPdfTurma } from '@/lib/turma-pdf'
 
@@ -59,16 +62,17 @@ interface Props {
   slotsComVagas: SlotComVagas[]
 }
 
-type Tab = 'turmas' | 'sessoes' | 'matriculas'
+type Tab = 'gestao' | 'turmas' | 'sessoes' | 'matriculas' | 'contrato'
 
 // ─── Aba Turmas (com seção Planos de Serviço) ─────────────────────────────────
 
-function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacientes, sequencias, planosServico: planosServicoProp, onAtualizar }: {
-  turmas: Turma[], matriculas: Matricula[], profissionais: Profissional[], salas: Sala[], servicos: Servico[], pacientes: Paciente[], sequencias?: Sequencia[], planosServico: PlanoServico[], onAtualizar: () => void
+function AbasTurmas({ turmas, matriculas, novasMatriculas, profissionais, salas, servicos, pacientes, sequencias, planosServico: planosServicoProp, slotsComVagas, onAtualizar }: {
+  turmas: Turma[], matriculas: Matricula[], novasMatriculas: NovaMatricula[], profissionais: Profissional[], salas: Sala[], servicos: Servico[], pacientes: Paciente[], sequencias?: Sequencia[], planosServico: PlanoServico[], slotsComVagas: SlotComVagas[], onAtualizar: () => void
 }) {
   const [modalCriar, setModalCriar] = useState(false)
   const [editarTurma, setEditarTurma] = useState<Turma | null>(null)
   const [matriculaInfo, setMatriculaInfo] = useState<{ turma: Turma } | null>(null)
+  const [slotDetalhe, setSlotDetalhe] = useState<{ turma: Turma; slotId: string } | null>(null)
   const [toast, setToast] = useState('')
   const [, startT] = useTransition()
 
@@ -320,12 +324,23 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
                 {/* Slots */}
                 <div className="space-y-1.5">
                   {t.slots.filter(s => s.ativo).map(s => {
-                    const alunosNoSlot = turmaMatriculas.filter(m => (m.slots_ids ?? []).includes(s.id)).length
+                    // Modelo legado: turma_matriculas com slots_ids
+                    const alunosLegado = turmaMatriculas.filter(m => (m.slots_ids ?? []).includes(s.id)).length
+                    // Novo modelo: matriculas → matricula_slots com slot_id
+                    const alunosNovo = novasMatriculas.filter(m =>
+                      m.status === 'ativo' &&
+                      (m.slots ?? []).some(ms => ms.slot_id === s.id && ms.ativo !== false)
+                    ).length
+                    const alunosNoSlot = alunosLegado + alunosNovo
                     const cap = s.capacidade_maxima ?? t.capacidade_slot
                     const pct = cap > 0 ? Math.round((alunosNoSlot / cap) * 100) : 0
                     const corBarra = pct >= 90 ? '#E74C3C' : pct >= 70 ? '#E67E22' : '#27AE60'
                     return (
-                      <div key={s.id} className="bg-[#F8F9FA] rounded-lg px-3 py-2">
+                      <button
+                        key={s.id}
+                        onClick={() => setSlotDetalhe({ turma: t, slotId: s.id })}
+                        className="w-full bg-[#F8F9FA] rounded-lg px-3 py-2 text-left hover:bg-[#F0F0F0] transition-colors cursor-pointer"
+                      >
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="font-semibold text-[#2C3E50]">{DIAS[s.dia_semana]} · {s.hora_inicio}–{s.hora_fim}</span>
                           <span className="text-[#7F8C8D]">{alunosNoSlot}/{cap}</span>
@@ -333,7 +348,7 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
                         <div className="h-1 bg-[#E8E8E8] rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: corBarra }} />
                         </div>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
@@ -354,7 +369,7 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
                     className="flex-1 h-8 rounded-lg bg-[#4A3AE8]/10 text-[#4A3AE8] text-xs font-semibold hover:bg-[#4A3AE8]/20">
                     Matricular Aluno
                   </button>
-                  <button onClick={() => gerarPdfTurma(t, matriculas)}
+                  <button onClick={() => gerarPdfTurma(t, matriculas, novasMatriculas)}
                     className="h-8 w-8 rounded-lg border border-[#E8E8E8] flex items-center justify-center text-[#7F8C8D] hover:text-[#27AE60] hover:border-[#27AE60]/30 transition-colors"
                     title="Gerar PDF da turma">
                     <FileText size={13} />
@@ -389,14 +404,13 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
       )}
 
       {matriculaInfo && (
-        <MatriculaModal
-          turmaId={matriculaInfo.turma.id}
-          turmaNome={matriculaInfo.turma.nome}
-          slots={matriculaInfo.turma.slots}
-          planos={matriculaInfo.turma.planos}
+        <MatriculaTurmaModal
+          turma={matriculaInfo.turma}
           pacientes={pacientes}
+          planosServico={planosServicoProp}
+          slotsComVagas={slotsComVagas}
           onClose={() => setMatriculaInfo(null)}
-          onConfirmado={() => { setMatriculaInfo(null); showToast('Aluno matriculado com sucesso!'); onAtualizar() }} />
+          onConfirmado={() => { setMatriculaInfo(null); showToast('Aluno(s) matriculado(s) com sucesso!'); onAtualizar() }} />
       )}
 
       {editarTurma && (
@@ -409,6 +423,49 @@ function AbasTurmas({ turmas, matriculas, profissionais, salas, servicos, pacien
           onClose={() => setEditarTurma(null)}
           onSalvo={() => { setEditarTurma(null); showToast('Turma atualizada.'); onAtualizar() }} />
       )}
+
+      {slotDetalhe && (() => {
+        const t = slotDetalhe.turma
+        const s = t.slots.find(x => x.id === slotDetalhe.slotId)
+        if (!s) return null
+        const turmaMatriculasSlot = matriculas.filter(m => m.turma_id === t.id && m.status === 'ativo')
+        const alunosAntigos: AlunoSlotInfo[] = turmaMatriculasSlot
+          .filter(m => (m.slots_ids ?? []).includes(s.id))
+          .map(m => ({
+            matricula_id: m.id,
+            paciente_id: m.paciente_id,
+            nome: m.pacientes?.nome ?? '—',
+            telefone: m.pacientes?.telefone ?? null,
+            planoNome: m.turma_planos?.nome ?? null,
+            planoFreq: m.turma_planos?.frequencia_semanal ?? null,
+            valor: m.turma_planos?.valor_mensal ?? null,
+            modelo: 'antigo' as const,
+          }))
+        const alunosNovos: AlunoSlotInfo[] = novasMatriculas
+          .filter(m => m.status === 'ativo' && (m.slots ?? []).some(ms => ms.slot_id === s.id && ms.ativo !== false))
+          .map(m => ({
+            matricula_id: m.id,
+            paciente_id: m.paciente_id,
+            nome: m.pacientes?.nome ?? '—',
+            telefone: m.pacientes?.telefone ?? null,
+            planoNome: m.planos_servico?.nome ?? null,
+            planoFreq: m.planos_servico?.dias_semana ?? null,
+            valor: m.planos_servico?.valor_mensal ?? null,
+            modelo: 'novo' as const,
+          }))
+        return (
+          <SlotDetailModal
+            turmaNome={t.nome}
+            turmaServicoId={t.servico_id ?? null}
+            slot={s}
+            capacidadeSlot={t.capacidade_slot}
+            alunos={[...alunosAntigos, ...alunosNovos]}
+            slotsComVagas={slotsComVagas}
+            onClose={() => setSlotDetalhe(null)}
+            onAtualizar={() => { setSlotDetalhe(null); onAtualizar() }}
+          />
+        )
+      })()}
     </div>
   )
 }
@@ -796,7 +853,7 @@ export function TurmasClient({
   turmas, matriculas, sessoes, profissionais, salas, servicos, pacientes, sequencias = [],
   planosServico, novasMatriculas, slotsComVagas,
 }: Props) {
-  const [tab, setTab] = useState<Tab>('turmas')
+  const [tab, setTab] = useState<Tab>('gestao')
   const [cobrancaMes, setCobrancaMes] = useState(new Date().toISOString().slice(0, 7))
   const [, startT] = useTransition()
   const [toastCob, setToastCob] = useState('')
@@ -816,10 +873,19 @@ export function TurmasClient({
 
   const totalMatriculas = matriculas.filter(m => m.status === 'ativo').length + novasMatriculas.filter(m => m.status === 'ativo').length
 
+  const pendentesGestao = novasMatriculas.filter(m => {
+    if (m.status !== 'ativo') return false
+    const plano = planosServico.find(p => p.id === m.plano_id)
+    if (!plano) return false
+    return (m.slots ?? []).filter(s => s.ativo !== false).length < plano.dias_semana
+  }).length
+
   const tabs: { id: Tab; label: string; count?: number }[] = [
-    { id: 'turmas',     label: 'Turmas',     count: turmas.length },
-    { id: 'sessoes',    label: 'Sessões',     count: sessoes.filter(s => s.status === 'agendada').length },
-    { id: 'matriculas', label: 'Matrículas',  count: totalMatriculas },
+    { id: 'gestao',     label: 'Gestão Turmas', count: pendentesGestao || undefined },
+    { id: 'turmas',     label: 'Turmas',         count: turmas.length },
+    { id: 'sessoes',    label: 'Sessões',         count: sessoes.filter(s => s.status === 'agendada').length },
+    { id: 'matriculas', label: 'Matrículas',      count: totalMatriculas },
+    { id: 'contrato',   label: 'Contrato' },
   ]
 
   return (
@@ -850,15 +916,33 @@ export function TurmasClient({
         )}
       </div>
 
+      {tab === 'gestao' && (
+        <AbaGestaoTurmas
+          novasMatriculas={novasMatriculas}
+          matriculas={matriculas}
+          turmas={turmas}
+          planosServico={planosServico}
+          slotsComVagas={slotsComVagas}
+          servicos={servicos}
+          profissionais={profissionais}
+          salas={salas}
+          pacientes={pacientes}
+          sequencias={sequencias}
+          onAtualizar={atualizar}
+          onNovoPlanosClick={() => setTab('turmas')}
+        />
+      )}
       {tab === 'turmas' && (
         <AbasTurmas
-          turmas={turmas} matriculas={matriculas} profissionais={profissionais}
-          salas={salas} servicos={servicos} pacientes={pacientes}
+          turmas={turmas} matriculas={matriculas} novasMatriculas={novasMatriculas}
+          profissionais={profissionais} salas={salas} servicos={servicos} pacientes={pacientes}
           sequencias={sequencias} planosServico={planosServico}
+          slotsComVagas={slotsComVagas}
           onAtualizar={atualizar}
         />
       )}
       {tab === 'sessoes' && <AbaSessoes sessoes={sessoes} matriculas={matriculas} onAtualizar={atualizar} />}
+      {tab === 'contrato' && <AbaContrato />}
       {tab === 'matriculas' && (
         <AbaMatriculas
           matriculas={matriculas}

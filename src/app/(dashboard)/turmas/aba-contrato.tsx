@@ -7,7 +7,7 @@ import {
   FileText, Settings2,
 } from 'lucide-react'
 import type { ContratoConfig } from '@/lib/contrato-pdf'
-import { gerarPDFContrato, abrirContratoPDF } from '@/lib/contrato-pdf'
+import { gerarPDFContrato, abrirContratoPDF, DEFAULT_CONFIG } from '@/lib/contrato-pdf'
 import { buscarConfigContratoAction, salvarConfigContratoAction } from './contrato-actions'
 
 // ─── Componentes auxiliares ───────────────────────────────────────────────────
@@ -166,14 +166,26 @@ export function AbaContrato() {
 
   // Carrega config ao montar
   useEffect(() => {
-    buscarConfigContratoAction().then(r => {
-      if ('error' in r) {
-        showToast(r.error, false)
-      } else {
-        setConfig(r.config)
-      }
-      setLoading(false)
-    })
+    buscarConfigContratoAction()
+      .then(r => {
+        if ('error' in r) {
+          console.warn('[AbaContrato] server action retornou erro:', r.error)
+          // Usa defaults para que a aba fique utilizável mesmo sem dados do servidor
+          setConfig({ ...DEFAULT_CONFIG })
+          showToast('Não foi possível carregar configurações salvas. Usando valores padrão.', false)
+        } else {
+          setConfig(r.config)
+        }
+      })
+      .catch(err => {
+        console.error('[AbaContrato] erro inesperado ao carregar config:', err)
+        // Fallback para defaults em caso de falha completa
+        setConfig({ ...DEFAULT_CONFIG })
+        showToast('Erro ao conectar com o servidor. Usando valores padrão.', false)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }, [])
 
   // Preview atualizado com debounce (300ms)

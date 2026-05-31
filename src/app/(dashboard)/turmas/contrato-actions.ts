@@ -5,7 +5,10 @@ import { getEmpresaId } from '@/lib/get-empresa-id'
 import type { ContratoConfig, DadosAluno, DadosPlano } from '@/lib/contrato-pdf'
 import { DEFAULT_CONFIG } from '@/lib/contrato-pdf'
 
-export type { ContratoConfig, DadosAluno, DadosPlano }
+// Re-lança erros especiais do Next.js (redirect, not-found) que não devem ser engolidos
+function isNextInternalError(e: unknown): boolean {
+  return !!(e && typeof e === 'object' && 'digest' in e)
+}
 
 // ─── Carregar configurações ────────────────────────────────────────────────────
 
@@ -48,7 +51,8 @@ export async function buscarConfigContratoAction(): Promise<
     }
 
     return { config }
-  } catch {
+  } catch (e) {
+    if (isNextInternalError(e)) throw e
     return { error: 'Erro ao carregar configurações do contrato.' }
   }
 }
@@ -77,7 +81,8 @@ export async function salvarConfigContratoAction(
 
     if (error) return { error: error.message }
     return { success: true }
-  } catch {
+  } catch (e) {
+    if (isNextInternalError(e)) throw e
     return { error: 'Erro ao salvar configurações do contrato.' }
   }
 }
@@ -204,6 +209,7 @@ export async function gerarContratoAlunoAction(matriculaId: string): Promise<
 
     return { config, aluno, plano }
   } catch (e) {
+    if (isNextInternalError(e)) throw e
     return { error: 'Erro ao gerar dados do contrato.' }
   }
 }

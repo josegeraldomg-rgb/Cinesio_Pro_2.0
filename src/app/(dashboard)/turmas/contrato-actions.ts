@@ -99,108 +99,110 @@ export async function gerarContratoAlunoAction(matriculaId: string): Promise<
     const { empresaId } = await getEmpresaId()
     const admin = createAdminClient()
 
-    // Busca em paralelo: config + matrícula
+    // 1. Busca config + dados básicos da matrícula em paralelo
     const [configResult, { data: mat }] = await Promise.all([
       buscarConfigContratoAction(),
       admin.from('matriculas')
-        .select(`
-          id, data_matricula, data_saida,
-          pacientes(nome, cpf, data_nascimento, telefone, email, endereco),
-          planos_servico(nome, dias_semana, valor_mensal, servicos(nome)),
-          matricula_slots(ativo, slot_id,
-            turma_slots(dia_semana, hora_inicio, hora_fim, duracao_minutos, capacidade_maxima, profissional_id,
-              turmas(capacidade_slot, nome)
-            )
-          )
-        `)
+        .select('id, paciente_id, plano_id, data_matricula, data_saida')
         .eq('id', matriculaId)
         .eq('empresa_id', empresaId)
         .maybeSingle(),
     ])
 
     if ('error' in configResult) return { error: configResult.error }
-    if (!mat)                    return { error: 'Matrícula não encontrada.' }
+    if (!mat) return { error: 'Matrícula não encontrada.' }
 
     const config = configResult.config
 
-    // Paciente
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pac = (mat.pacientes as any) as {
-      nome: string; cpf?: string; data_nascimento?: string;
-      telefone?: string; email?: string;
-      endereco?: { rua?: string; numero?: string; bairro?: string; cidade?: string; estado?: string } | null
-    } | null
+    // 2. Busca dados complementares em paralelo
+    const [
+      { data: paciente },
+      { data: planoServico },
+      { data: matSlots },
+    ] = await Promise.all([
+      admin.from('pacientes')
+        .select('nome, cpf, data_nascimento, telefone, email, endereco')
+        .eq('id', mat.paciente_id)
+        .eq('empresa_id', empresaId)
+        .maybeSingle(),
+      mat.plano_id
+        ? admin.from('planos_servico')
+            .select('id, nome, dias_semana, valor_mensal, servico_id')
+            .eq('id', mat.plano_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      admin.from('matricula_slots')
+        .select('slot_id, ativo')
+        .eq('matricula_id', matriculaId)
+        .eq('ativo', true),
+    ])
 
-    const end = pac?.endereco
+    // 3. Busca nome do serviço e slots da turma (se houver plano/slots)
+    const slotIds = (matSlots ?? []).map((s: any) => s.slot_id).filter(Boolean)
+
+    const [{ data: servico }, { data: turmaSlots }] = await Promise.all([
+      planoServico?.servico_id
+        ? admin.from('servicos').select('nome').eq('id', planoServico.servico_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      slotIds.length > 0
+        ? admin.from('turma_slots')
+            .select('id, dia_semana, hora_inicio, hora_fim, duracao_minutos, capacidade_maxima, profissional_id, turmas(capacidade_slot)')
+            .in('id', slotIds)
+        : Promise.resolve({ data: [] }),
+    ])
+
+    // 4. Busca nome do profissional do primeiro slot (se tiver)
+    const primeiroSlot = (turmaSlots as any[])?.[0]
+    const profId = primeiroSlot?.profissional_id
+    let instrNome: string | null = null
+    if (profId) {
+      const { data: prof } = await admin
+        .from('profissionais').select('nome').eq('id', profId).maybeSingle()
+      instrNome = prof?.nome ?? null
+    }
+
+    // ── Monta DadosAluno ──
+    const end = (paciente?.endereco as any) as {
+      rua?: string; numero?: string; bairro?: string; cidade?: string; estado?: string
+    } | null | undefined
+
     const endParts = [
       end?.rua && end?.numero ? `${end.rua}, ${end.numero}` : end?.rua,
       end?.bairro,
     ].filter(Boolean)
 
     const aluno: DadosAluno = {
-      nome:            pac?.nome             ?? '___________',
-      cpf:             pac?.cpf              ?? null,
-      data_nascimento: pac?.data_nascimento  ?? null,
+      nome:            paciente?.nome            ?? '___________',
+      cpf:             (paciente as any)?.cpf    ?? null,
+      data_nascimento: (paciente as any)?.data_nascimento ?? null,
       rg:              null,
-      telefone:        pac?.telefone         ?? null,
-      email:           pac?.email            ?? null,
+      telefone:        paciente?.telefone        ?? null,
+      email:           (paciente as any)?.email  ?? null,
       endereco:        endParts.length > 0 ? endParts.join(' — ') : null,
-      cidade:          end?.cidade           ?? null,
-      estado:          end?.estado           ?? null,
+      cidade:          end?.cidade               ?? null,
+      estado:          end?.estado               ?? null,
     }
 
-    // Plano
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pl = (mat.planos_servico as any) as {
-      nome: string; dias_semana: number; valor_mensal: number;
-      servicos?: { nome: string } | null
-    } | null
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const slots = ((mat.matricula_slots as any) as {
-      ativo: boolean;
-      turma_slots?: {
-        dia_semana: number; hora_inicio: string; hora_fim: string;
-        duracao_minutos: number; capacidade_maxima?: number;
-        profissional_id?: string;
-        turmas?: { capacidade_slot?: number; nome?: string } | null
-      } | null
-    }[] | null) ?? []
-
-    const slotsAtivos = slots.filter(s => s.ativo && s.turma_slots)
-
-    // Busca profissional do primeiro slot, se tiver profissional_id
-    const profId = slotsAtivos[0]?.turma_slots?.profissional_id
-    let instrNome: string | null = null
-    if (profId) {
-      const { data: prof } = await admin
-        .from('profissionais')
-        .select('nome')
-        .eq('id', profId)
-        .maybeSingle()
-      instrNome = prof?.nome ?? null
-    }
-
-    const diasNums = [...new Set(slotsAtivos.map(s => s.turma_slots!.dia_semana))].sort()
+    // ── Monta DadosPlano ──
+    const diasNums = [...new Set((turmaSlots as any[] ?? []).map((s: any) => s.dia_semana))].sort() as number[]
     const diasStr  = diasNums.length > 0
       ? diasNums.map(d => DIAS_NOME[d]).join(', ')
-      : `${pl?.dias_semana ?? 1}x/semana`
+      : `${planoServico?.dias_semana ?? 1}x/semana`
 
-    const primeiroSlot = slotsAtivos[0]?.turma_slots
-    const horarioStr   = primeiroSlot
-      ? `${diasStr} — ${primeiroSlot.hora_inicio.slice(0, 5)}`
+    const horarioStr = primeiroSlot
+      ? `${diasStr} — ${String(primeiroSlot.hora_inicio).slice(0, 5)}`
       : diasStr
 
     const plano: DadosPlano = {
-      nome_servico:       pl?.servicos?.nome ?? pl?.nome ?? 'Serviço',
-      modalidade:         pl?.nome           ?? '___________',
-      frequencia_semanal: pl?.dias_semana    ?? 1,
-      valor_mensal:       pl?.valor_mensal   ?? 0,
+      nome_servico:       servico?.nome ?? planoServico?.nome ?? 'Serviço',
+      modalidade:         planoServico?.nome ?? '___________',
+      frequencia_semanal: planoServico?.dias_semana ?? 1,
+      valor_mensal:       planoServico?.valor_mensal ?? 0,
       dias_semana_str:    diasStr,
       horario_str:        horarioStr,
       duracao_minutos:    primeiroSlot?.duracao_minutos  ?? null,
       max_alunos:         primeiroSlot?.capacidade_maxima
-                          ?? primeiroSlot?.turmas?.capacidade_slot
+                          ?? (primeiroSlot?.turmas as any)?.capacidade_slot
                           ?? null,
       nome_instrutor:     instrNome,
       data_inicio:        mat.data_matricula,

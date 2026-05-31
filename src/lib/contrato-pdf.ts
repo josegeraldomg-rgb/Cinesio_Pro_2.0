@@ -476,8 +476,18 @@ export function gerarPDFContrato(
 
   const valorFmt   = pl.valor_mensal > 0 ? `R$ ${pl.valor_mensal.toFixed(2).replace('.', ',')}` : '[Valor]'
   const valorExt   = pl.valor_mensal > 0 ? valorPorExtenso(pl.valor_mensal) : '[valor por extenso]'
-  const prazoMeses = calcMeses(pl.data_inicio, pl.data_fim) ?? config.vigencia_meses
-  const temPrazo   = !!pl.data_fim
+
+  // Calcula data de fim: usa data_fim real se existir; caso contrário, soma vigencia_meses ao início
+  const dataFimEfetiva = pl.data_fim ?? (() => {
+    try {
+      const d = new Date(pl.data_inicio + 'T12:00:00')
+      d.setMonth(d.getMonth() + config.vigencia_meses)
+      return d.toISOString().slice(0, 10)
+    } catch { return null }
+  })()
+
+  const prazoMeses = calcMeses(pl.data_inicio, dataFimEfetiva) ?? config.vigencia_meses
+  const temPrazo   = true  // sempre usa prazo determinado (com base na vigência configurada)
   const cidade     = config.cidade_foro || config.cidade_empresa || al.cidade || '___________'
   const estado     = config.estado_foro || config.estado_empresa || al.estado || '__'
   const instrNome  = pl.nome_instrutor || config.responsavel_tecnico || '___________'
@@ -557,12 +567,8 @@ export function gerarPDFContrato(
     <table class="dados">
       <tr><th>Item</th><th>Descrição</th></tr>
       <tr><td class="td-r">Modalidade</td><td>${blank(pl.modalidade)}</td></tr>
-      <tr><td class="td-r">Turma / Horário</td><td>${blank(pl.horario_str)}</td></tr>
       <tr><td class="td-r">Frequência semanal</td><td><strong>${pl.frequencia_semanal}x por semana</strong></td></tr>
-      <tr><td class="td-r">Dias da semana</td><td>${blank(pl.dias_semana_str)}</td></tr>
       <tr><td class="td-r">Duração de cada aula</td><td><strong>${pl.duracao_minutos ?? '___'} minutos</strong></td></tr>
-      <tr><td class="td-r">Máximo de alunos por aula</td><td><strong>${pl.max_alunos ?? '___'} aluno(s)</strong></td></tr>
-      <tr><td class="td-r">Instrutor(a) responsável</td><td>${instrNome}</td></tr>
     </table>
     <div class="clausula-item">1.2. A CONTRATADA poderá substituir o(a) instrutor(a) por profissional igualmente habilitado, sem que isso configure descumprimento contratual.</div>
   </div>
@@ -571,11 +577,8 @@ export function gerarPDFContrato(
 <div class="clausula no-break">
   <div class="clausula-titulo">Cláusula 2 — Prazo de Vigência</div>
   <div class="clausula-body">
-    ${temPrazo
-      ? `<div class="clausula-item">2.1. O presente contrato terá vigência de <strong>${prazoMeses} meses</strong>, com início em <strong>${fmtDataExtenso(pl.data_inicio)}</strong> e término em <strong>${fmtDataExtenso(pl.data_fim)}</strong>.</div>
-         <div class="clausula-item">2.2. Findo o prazo, o contrato ${config.renovacao_automatica ? 'será <strong>renovado automaticamente</strong> por igual período' : 'deverá ser renovado expressamente por escrito'}, salvo manifestação contrária de qualquer das partes com antecedência mínima de <strong>${config.aviso_previo_dias} dias</strong> antes do vencimento.</div>`
-      : `<div class="clausula-item">2.1. O presente contrato vigorará por <strong>prazo indeterminado</strong>, com início em <strong>${fmtDataExtenso(pl.data_inicio)}</strong>, podendo ser rescindido por qualquer das partes conforme a Cláusula 7.</div>
-         <div class="clausula-item">2.2. Para rescisão, é necessário aviso prévio por escrito com antecedência mínima de <strong>${config.aviso_previo_dias} dias</strong>.</div>`}
+    <div class="clausula-item">2.1. O presente contrato terá vigência de <strong>${prazoMeses} meses</strong>, com início em <strong>${fmtDataExtenso(pl.data_inicio)}</strong> e término em <strong>${fmtDataExtenso(dataFimEfetiva)}</strong>.</div>
+    <div class="clausula-item">2.2. Findo o prazo, o contrato ${config.renovacao_automatica ? 'será <strong>renovado automaticamente</strong> por igual período' : 'deverá ser renovado expressamente por escrito'}, salvo manifestação contrária de qualquer das partes com antecedência mínima de <strong>${config.aviso_previo_dias} dias</strong> antes do vencimento.</div>
   </div>
 </div>
 
